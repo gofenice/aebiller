@@ -1,0 +1,82 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-brand-50: oklch(0.979 0.021 166.113);
+    --color-brand-100: oklch(0.95 0.052 163.051);
+    --color-brand-200: oklch(0.905 0.093 164.15);
+    --color-brand-300: oklch(0.845 0.143 164.978);
+    --color-brand-400: oklch(0.765 0.177 163.223);
+    --color-brand-500: oklch(0.696 0.17 162.48);
+    --color-brand-600: oklch(0.596 0.145 163.225);
+    --color-brand-700: oklch(0.508 0.118 165.612);
+    --color-brand-800: oklch(0.432 0.095 166.913);
+    --color-brand-900: oklch(0.378 0.077 168.94);
+    --color-brand-950: oklch(0.262 0.051 172.552);
+}
+
+@layer base {
+    [x-cloak] {
+        display: none !important;
+    }
+
+    body {
+        @apply bg-slate-50 text-slate-800 antialiased;
+    }
+}
+
+@layer components {
+    .form-input {
+        @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs
+            placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none
+            disabled:cursor-not-allowed disabled:bg-slate-100;
+    }
+
+    .form-label {
+        @apply mb-1.5 block text-sm font-medium text-slate-700;
+    }
+
+    .form-hint {
+        @apply mt-1 text-xs text-slate-500;
+    }
+
+    .card {
+        @apply rounded-xl border border-slate-200 bg-white shadow-xs;
+    }
+
+    .table-cell {
+        @apply px-4 py-3 text-sm whitespace-nowrap;
+    }
+
+    .table-head {
+        @apply px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase;
+    }
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    body {
+        background: #fff;
+    }
+
+    .receipt {
+        width: 80mm;
+        max-width: 80mm;
+        margin: 0;
+        border: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+    }
+
+    @page {
+        margin: 6mm;
+    }
+}

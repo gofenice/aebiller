@@ -1,0 +1,256 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\MovementType;
+use App\Enums\PaymentMethod;
+use App\Enums\SaleStatus;
+use App\Models\Product;
+use App\Models\Sale;
+use App\Models\User;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
+
+/**
+ * Turns a till basket into a posted bill: prices the lines, splits out VAT,
+ * writes the sale and takes the goods out of stock.
+ */
+class BillingService
+{
+    public function __construct(protected InventoryService $inventory) {}
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @param  array<int, array<string, mixed>>  $lines
+     */
+    public function createSale(array $attributes, array $lines, User $cashier): Sale
+    {
+        if ($lines === []) {
+            throw new RuntimeException('The basket is empty.');
+        }
+
+        return DB::transaction(function () use ($attributes, $lines, $cashier): Sale {
+            $priced = $this->priceBasket($lines, (float) ($attributes['bill_discount'] ?? 0));
+
+            $paymentMethod = $attributes['payment_method'] instanceof PaymentMethod
+                ? $attributes['payment_method']
+                : PaymentMethod::from($attributes['payment_method']);
+
+            $grandTotal = $priced['totals']['grand_total'];
+            $amountPaid = $paymentMethod->needsTendering()
+                ? (float) ($attributes['amount_paid'] ?? $grandTotal)
+                : $grandTotal;
+
+            if ($paymentMethod->needsTendering() && $amountPaid + 0.001 < $grandTotal) {
+                throw new RuntimeException(sprintf(
+                    'Cash tendered (%s) is less than the bill total (%s).',
+                    number_format($amountPaid, 2),
+                    number_format($grandTotal, 2),
+                ));
+            }
+
+            $sale = Sale::create([
+                'invoice_no' => $this->inventory->nextReference(Sale::class, 'INV', 'invoice_no'),
+                'status' => SaleStatus::Completed,
+                'customer_name' => $attributes['customer_name'] ?? null,
+                'customer_phone' => $attributes['customer_phone'] ?? null,
+                'customer_vat_number' => $attributes['customer_vat_number'] ?? null,
+                ...$priced['totals'],
+                'payment_method' => $paymentMethod,
+                'amount_paid' => round($amountPaid, 2),
+                'change_due' => round(max($amountPaid - $grandTotal, 0), 2),
+                'notes' => $attributes['notes'] ?? null,
+                'cashier_id' => $cashier->id,
+                'sold_at' => $attributes['sold_at'] ?? now(),
+            ]);
+
+            foreach ($priced['lines'] as $line) {
+                $product = $line['product'];
+
+                $sale->items()->create([
+                    'product_id' => $product->id,
+                    'name' => $product->display_name,
+                    'sku' => $product->sku,
+                    'unit_code' => $product->unit?->code,
+                    'quantity' => $line['quantity'],
+                    'unit_price' => $line['unit_price'],
+                    'discount_percent' => $line['discount_percent'],
+                    'discount_amount' => $line['discount_amount'],
+                    'vat_rate' => $line['vat_rate'],
+                    'line_subtotal' => $line['line_subtotal'],
+                    'line_vat' => $line['line_vat'],
+                    'line_total' => $line['line_total'],
+                    'unit_cost' => $line['unit_cost'],
+                ]);
+
+                $this->inventory->issueStock(
+                    product: $product,
+                    quantity: $line['quantity'],
+                    type: MovementType::Sale,
+                    user: $cashier,
+                    source: $sale,
+                    reference: $sale->invoice_no,
+                    movedAt: Carbon::parse($sale->sold_at),
+                );
+            }
+
+            return $sale->fresh(['items', 'cashier']);
+        });
+    }
+
+    /**
+     * Cancel a posted bill and put the goods back on the shelf.
+     */
+    public function voidSale(Sale $sale, User $user, ?string $reason = null): void
+    {
+        if ($sale->isVoided()) {
+            throw new RuntimeException("Bill {$sale->invoice_no} has already been voided.");
+        }
+
+        DB::transaction(function () use ($sale, $user, $reason): void {
+            $sale->loadMissing('items');
+
+            foreach ($sale->items as $item) {
+                if ($item->product_id === null) {
+                    continue;
+                }
+
+                $product = Product::lockForUpdate()->find($item->product_id);
+
+                if ($product === null) {
+                    continue;
+                }
+
+                $this->inventory->returnStock(
+                    product: $product,
+                    quantity: (float) $item->quantity,
+                    type: MovementType::SalesReturn,
+                    user: $user,
+                    source: $sale,
+                    reference: $sale->invoice_no,
+                    notes: "Void of {$sale->invoice_no}",
+                );
+            }
+
+            $sale->update([
+                'status' => SaleStatus::Voided,
+                'voided_by' => $user->id,
+                'voided_at' => now(),
+                'void_reason' => $reason,
+            ]);
+        });
+    }
+
+    /**
+     * Price every line, split VAT out of the shelf price and spread any
+     * bill-level discount across the lines so the VAT stays correct.
+     *
+     * @param  array<int, array<string, mixed>>  $lines
+     * @return array{lines: array<int, array<string, mixed>>, totals: array<string, float>}
+     */
+    public function priceBasket(array $lines, float $billDiscount = 0): array
+    {
+        $priced = [];
+        $itemsGross = 0.0;
+        $lineDiscountTotal = 0.0;
+        $afterLineDiscount = 0.0;
+
+        foreach ($lines as $line) {
+            $product = $line['product'] ?? Product::with('unit')->lockForUpdate()->findOrFail($line['product_id']);
+            $quantity = round((float) $line['quantity'], 3);
+
+            if ($quantity <= 0) {
+                continue;
+            }
+
+            if (! $product->is_active) {
+                throw new RuntimeException("{$product->name} is not active and cannot be sold.");
+            }
+
+            if ($quantity > (float) $product->current_stock) {
+                throw new RuntimeException(sprintf(
+                    '%s has only %s %s in stock — the basket asks for %s.',
+                    $product->name,
+                    rtrim(rtrim(number_format((float) $product->current_stock, 3, '.', ''), '0'), '.'),
+                    $product->unit?->code ?? 'units',
+                    rtrim(rtrim(number_format($quantity, 3, '.', ''), '0'), '.'),
+                ));
+            }
+
+            $unitPrice = isset($line['unit_price']) && (float) $line['unit_price'] > 0
+                ? round((float) $line['unit_price'], 2)
+                : (float) $product->selling_price;
+
+            $discountPercent = min(max((float) ($line['discount_percent'] ?? 0), 0), 100);
+            $gross = round($quantity * $unitPrice, 2);
+            $discountAmount = round($gross * $discountPercent / 100, 2);
+            $net = round($gross - $discountAmount, 2);
+
+            $itemsGross += $gross;
+            $lineDiscountTotal += $discountAmount;
+            $afterLineDiscount += $net;
+
+            $priced[] = [
+                'product' => $product,
+                'quantity' => $quantity,
+                'unit_price' => $unitPrice,
+                'discount_percent' => $discountPercent,
+                'discount_amount' => $discountAmount,
+                'net' => $net,
+                'vat_rate' => (float) $product->tax_rate,
+                'unit_cost' => (float) $product->cost_price,
+            ];
+        }
+
+        if ($priced === []) {
+            throw new RuntimeException('The basket is empty.');
+        }
+
+        $billDiscount = round(min(max($billDiscount, 0), $afterLineDiscount), 2);
+        $distributed = 0.0;
+        $lastIndex = count($priced) - 1;
+
+        foreach ($priced as $index => &$line) {
+            // The final line absorbs the rounding remainder so the discount
+            // spread always adds back up to the figure the cashier entered.
+            $share = $index === $lastIndex
+                ? round($billDiscount - $distributed, 2)
+                : ($afterLineDiscount > 0 ? round($billDiscount * $line['net'] / $afterLineDiscount, 2) : 0.0);
+
+            $distributed += $share;
+            $net = round($line['net'] - $share, 2);
+            $rate = $line['vat_rate'];
+
+            if ($line['product']->price_includes_tax) {
+                $vat = round($net * $rate / (100 + $rate), 2);
+                $subtotal = round($net - $vat, 2);
+                $total = $net;
+            } else {
+                $subtotal = $net;
+                $vat = round($net * $rate / 100, 2);
+                $total = round($net + $vat, 2);
+            }
+
+            $line['line_subtotal'] = $subtotal;
+            $line['line_vat'] = $vat;
+            $line['line_total'] = $total;
+        }
+        unset($line);
+
+        $totals = [
+            'items_gross' => round($itemsGross, 2),
+            'line_discount_total' => round($lineDiscountTotal, 2),
+            'bill_discount' => $billDiscount,
+            'subtotal_excl_vat' => round(array_sum(array_column($priced, 'line_subtotal')), 2),
+            'vat_total' => round(array_sum(array_column($priced, 'line_vat')), 2),
+            'grand_total' => round(array_sum(array_column($priced, 'line_total')), 2),
+            'cost_total' => round(array_sum(array_map(
+                fn (array $line): float => $line['quantity'] * $line['unit_cost'],
+                $priced,
+            )), 2),
+        ];
+
+        return ['lines' => $priced, 'totals' => $totals];
+    }
+}
