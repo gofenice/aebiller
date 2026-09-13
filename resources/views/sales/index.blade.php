@@ -78,6 +78,10 @@
                                 </td>
                                 <td class="table-cell text-slate-700">
                                     {{ $sale->customer_name ?? 'Walk-in' }}
+                                    @if ($sale->customer_id)
+                                        <a href="{{ route('customers.show', $sale->customer_id) }}" class="ml-0.5 text-xs text-amber-500 hover:text-amber-600"
+                                            title="Loyalty member">★</a>
+                                    @endif
                                     @if ($sale->customer_phone)
                                         <span class="block text-xs text-slate-400">{{ $sale->customer_phone }}</span>
                                     @endif

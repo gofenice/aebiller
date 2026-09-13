@@ -1,6 +1,7 @@
 <x-layouts.app title="Products">
     <x-page-header title="Products" description="Everything the store stocks — packet goods and loose produce.">
         <x-slot:actions>
+            <x-button :href="route('products.labels')" variant="secondary" target="_blank">▮▯▮ Barcode labels</x-button>
             <x-button :href="route('products.create', ['type' => 'loose'])" variant="secondary">+ Loose item</x-button>
             <x-button :href="route('products.create')">+ New product</x-button>
         </x-slot:actions>

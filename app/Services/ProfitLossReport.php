@@ -135,7 +135,7 @@ class ProfitLossReport
                 DB::raw('coalesce(sum(subtotal_excl_vat), 0) as revenue'),
                 DB::raw('coalesce(sum(vat_total), 0) as vat'),
                 DB::raw('coalesce(sum(cost_total), 0) as cogs'),
-                DB::raw('coalesce(sum(line_discount_total + bill_discount), 0) as discounts'),
+                DB::raw('coalesce(sum(line_discount_total + bill_discount + loyalty_discount), 0) as discounts'),
             )
             ->first();
 

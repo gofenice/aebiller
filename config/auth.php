@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\PlatformUser;
 use App\Models\User;
 
 return [
@@ -38,9 +39,17 @@ return [
     */
 
     'guards' => [
+        // Shop staff, signing in on their own store's subdomain.
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
+        ],
+
+        // The platform's own people, on the central domain. A separate guard
+        // and table, so running the platform is never the same as running a shop.
+        'platform' => [
+            'driver' => 'session',
+            'provider' => 'platform_users',
         ],
     ],
 
@@ -65,6 +74,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        'platform_users' => [
+            'driver' => 'eloquent',
+            'model' => PlatformUser::class,
         ],
 
         // 'users' => [

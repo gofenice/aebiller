@@ -35,4 +35,25 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Razorpay
+    |--------------------------------------------------------------------------
+    |
+    | The platform's own Razorpay account, used to collect subscriptions from
+    | stores. Without a key the pay-online button is hidden and payments are
+    | recorded by hand instead.
+    |
+    | The webhook secret is set on the same page in the Razorpay dashboard as
+    | the webhook itself, and is what proves a callback really came from them.
+    |
+    */
+
+    'razorpay' => [
+        'key' => env('RAZORPAY_KEY_ID'),
+        'secret' => env('RAZORPAY_KEY_SECRET'),
+        'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET'),
+        'base_url' => env('RAZORPAY_BASE_URL', 'https://api.razorpay.com/v1'),
+    ],
+
 ];

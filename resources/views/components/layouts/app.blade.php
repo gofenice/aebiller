@@ -4,6 +4,12 @@
     $user = auth()->user();
     $lowStockCount = \App\Models\Product::active()->lowStock()->count()
         + \App\Models\Product::active()->outOfStock()->count();
+
+    // Only the owner is shown the subscription warning; cashiers cannot act on it.
+    $store = \App\Support\StoreContext::get();
+    $subscriptionInvoice = $user->isSuperAdmin() && $store !== null
+        ? $store->invoices()->unpaid()->orderBy('due_on')->first()
+        : null;
 @endphp
 
 <!DOCTYPE html>
@@ -47,6 +53,11 @@
             </div>
 
             <div class="space-y-1">
+                <p class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Customers</p>
+                <x-nav-link :href="route('customers.index')" :active="request()->routeIs('customers.*')" icon="★">Loyalty Members</x-nav-link>
+            </div>
+
+            <div class="space-y-1">
                 <p class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Inventory</p>
                 <x-nav-link :href="route('products.index')" :active="request()->routeIs('products.*')" icon="▤">Products</x-nav-link>
                 <x-nav-link :href="route('stock-entries.index')" :active="request()->routeIs('stock-entries.*')" icon="↓">Stock Entry</x-nav-link>
@@ -74,6 +85,7 @@
                     :badge="$lowStockCount ?: null">Low Stock</x-nav-link>
                 <x-nav-link :href="route('reports.expiry')" :active="request()->routeIs('reports.expiry')" icon="⏱">Expiry</x-nav-link>
                 <x-nav-link :href="route('reports.valuation')" :active="request()->routeIs('reports.valuation')" icon="¤">Stock Valuation</x-nav-link>
+                <x-nav-link :href="route('reports.loyalty')" :active="request()->routeIs('reports.loyalty')" icon="✦">Loyalty</x-nav-link>
                 @can('manage-expenses')
                     <x-nav-link :href="route('reports.profit-loss')" :active="request()->routeIs('reports.profit-loss')" icon="↗">Income &amp; Expenses</x-nav-link>
                 @endcan
@@ -83,6 +95,9 @@
                 <div class="space-y-1">
                     <p class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Administration</p>
                     <x-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')" icon="◍">Staff Accounts</x-nav-link>
+                    @can('manage-loyalty')
+                        <x-nav-link :href="route('loyalty.settings')" :active="request()->routeIs('loyalty.*')" icon="★">Loyalty Settings</x-nav-link>
+                    @endcan
                 </div>
             @endcan
         </nav>
@@ -128,6 +143,42 @@
 
         <main class="px-4 py-6 sm:px-6 lg:px-8">
             <x-alerts />
+
+            @if ($store?->isOnTrial() && $user->isSuperAdmin())
+                <div class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ink-200 bg-ink-50 px-4 py-3 text-sm">
+                    <div>
+                        <p class="font-semibold text-ink-900">
+                            Free trial — {{ $store->trialDaysLeft() }} day(s) left
+                        </p>
+                        <p class="mt-0.5 text-ink-600">
+                            Everything is yours to try until {{ $store->trial_ends_on->format('d M Y') }}. Subscribe before then and nothing is interrupted.
+                        </p>
+                    </div>
+                    <x-button :href="route('subscription.show')" size="sm">Subscribe</x-button>
+                </div>
+            @endif
+
+            @if ($subscriptionInvoice)
+                @php $dueSoon = $subscriptionInvoice->isDueSoon(); @endphp
+                <div @class([
+                    'mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm',
+                    'border-amber-200 bg-amber-50 text-amber-800' => $dueSoon,
+                    'border-red-200 bg-red-50 text-red-800' => ! $dueSoon,
+                ])>
+                    <div>
+                        <p class="font-semibold">{{ $dueSoon ? 'Subscription due soon' : 'Subscription overdue' }}</p>
+                        <p class="mt-0.5">
+                            Invoice {{ $subscriptionInvoice->number }} ({{ $subscriptionInvoice->periodLabel() }}) —
+                            {{ $subscriptionInvoice->currency_code }} {{ number_format($subscriptionInvoice->outstanding(), 2) }} —
+                            {{ $dueSoon ? 'is due on' : 'was due on' }} {{ $subscriptionInvoice->due_on->format('d M Y') }}.
+                            @if (! $dueSoon && $store?->auto_suspend)
+                                The shop closes on {{ $subscriptionInvoice->suspendOn()->format('d M Y') }} if it is not paid.
+                            @endif
+                        </p>
+                    </div>
+                    <x-button :href="route('subscription.show')" size="sm" :variant="$dueSoon ? 'secondary' : 'danger'">Pay now</x-button>
+                </div>
+            @endif
             {{ $slot }}
         </main>
     </div>

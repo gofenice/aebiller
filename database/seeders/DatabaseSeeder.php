@@ -13,6 +13,12 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            // The platform's own sign-in and price list, on the central domain.
+            PlatformUserSeeder::class,
+            PlanSeeder::class,
+            // Then the store everything else belongs to, which also puts that
+            // store into context for the seeders that follow.
+            StoreSeeder::class,
             UserSeeder::class,
             UnitSeeder::class,
             CategorySeeder::class,
@@ -21,6 +27,7 @@ class DatabaseSeeder extends Seeder
             ProductSeeder::class,
             InventorySeeder::class,
             ExpenseSeeder::class,
+            LoyaltySeeder::class,
         ]);
     }
 }

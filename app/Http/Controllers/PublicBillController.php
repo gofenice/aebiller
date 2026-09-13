@@ -15,7 +15,7 @@ class PublicBillController extends Controller
      */
     public function __invoke(Sale $sale): View
     {
-        $sale->load('items');
+        $sale->load(['items', 'customer.activeCard']);
 
         return view('bills.show', ['sale' => $sale]);
     }

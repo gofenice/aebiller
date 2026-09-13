@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Enums\PaymentMethod;
 use App\Http\Requests\StoreSaleRequest;
 use App\Models\Category;
+use App\Models\LoyaltySetting;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Services\BillingService;
 use App\Services\InventoryService;
+use App\Services\LoyaltyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +22,7 @@ class BillingController extends Controller
     public function __construct(
         protected BillingService $billing,
         protected InventoryService $inventory,
+        protected LoyaltyService $loyalty,
     ) {}
 
     /**
@@ -41,6 +44,7 @@ class BillingController extends Controller
                 ->limit(12)
                 ->get(),
             'categories' => Category::active()->orderBy('name')->get(),
+            'loyalty' => LoyaltySetting::current()->forTill(),
         ]);
     }
 
@@ -82,6 +86,21 @@ class BillingController extends Controller
             ->active()
             ->where(fn ($query) => $query->where('barcode', $code)->orWhere('sku', $code))
             ->first();
+
+        // A loyalty card scanned into the product box, or a member's mobile
+        // number typed there, attaches the member instead of adding an item.
+        if ($exact === null) {
+            $found = $this->loyalty->findMember($code);
+
+            if ($found['customer'] !== null || $found['error'] !== null) {
+                return response()->json([
+                    'match' => null,
+                    'results' => [],
+                    'member' => $found['customer'] !== null ? $this->loyalty->presentForTill($found['customer']) : null,
+                    'member_error' => $found['error'],
+                ]);
+            }
+        }
 
         // Names that start with what was typed come first, so "toma" offers
         // Tomato before it offers Tide Automatic.

@@ -69,7 +69,7 @@ class SaleController extends Controller
     {
         $this->authorize('run-till');
 
-        $sale->load(['items', 'cashier', 'voider']);
+        $sale->load(['items', 'cashier', 'voider', 'customer.activeCard']);
 
         return view('sales.show', [
             'sale' => $sale,

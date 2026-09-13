@@ -51,8 +51,14 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-stock', fn (User $user): bool => $user->is_active);
         Gate::define('run-till', fn (User $user): bool => $user->is_active);
         Gate::define('manage-expenses', fn (User $user): bool => $user->is_active);
+        Gate::define('manage-customers', fn (User $user): bool => $user->is_active);
+
+        // Paying the shop's own subscription is the owner's business.
+        Gate::define('manage-subscription', fn (User $user): bool => $user->isSuperAdmin());
 
         Gate::define('delete-records', fn (User $user): bool => $user->isSuperAdmin());
         Gate::define('manage-users', fn (User $user): bool => $user->isSuperAdmin());
+        // Programme rules and hand-entered points are money given away.
+        Gate::define('manage-loyalty', fn (User $user): bool => $user->isSuperAdmin());
     }
 }

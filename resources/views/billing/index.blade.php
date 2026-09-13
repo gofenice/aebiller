@@ -3,7 +3,12 @@
         $symbol = config('inventory.currency_symbol');
     @endphp
 
-    <div x-data="posTerminal({ scanUrl: '{{ route('billing.scan') }}' })"
+    <div x-data="posTerminal({
+            scanUrl: '{{ route('billing.scan') }}',
+            memberUrl: '{{ route('billing.member') }}',
+            enrolUrl: '{{ route('billing.member.store') }}',
+            loyalty: {{ Js::from($loyalty) }},
+        })"
         x-on:keydown.escape="code = ''; dismissSuggestions(); focusScanner()">
 
         <x-page-header title="Billing" :description="'Next bill '.$nextInvoice.' · scan the label or type the product code'">
@@ -72,7 +77,8 @@
                             No product matches “<span class="font-medium text-slate-700" x-text="code"></span>”.
                         </p>
 
-                        <div x-show="notice" x-cloak class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                        <div x-show="notice" x-cloak class="mt-3 rounded-lg px-3 py-2 text-sm"
+                            x-bind:class="notice?.tone === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'"
                             x-text="notice?.message"></div>
                     </div>
 
@@ -196,6 +202,103 @@
                         </div>
 
                         <div class="space-y-4 p-5">
+                            <input type="hidden" name="customer_id" x-bind:value="member ? member.id : ''">
+                            <input type="hidden" name="redeem_points" x-bind:value="appliedRedeemPoints || ''">
+
+                            {{-- Loyalty member: scan the card here or into the product box, or type the mobile number. --}}
+                            <div class="rounded-lg border border-slate-200 p-3">
+                                <template x-if="!member">
+                                    <div>
+                                        <label for="member_search" class="form-label">Loyalty member</label>
+                                        <input type="text" id="member_search" x-model="memberQuery" autocomplete="off"
+                                            x-on:input.debounce.250ms="searchMember(false)"
+                                            x-on:keydown.enter.prevent="searchMember(true)"
+                                            placeholder="Scan card, or mobile number / name" class="form-input">
+
+                                        <p x-show="memberError" x-cloak class="mt-2 text-xs text-red-600" x-text="memberError"></p>
+
+                                        <div x-show="memberResults.length" x-cloak
+                                            class="mt-2 max-h-56 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+                                            <template x-for="result in memberResults" :key="result.id">
+                                                <button type="button" x-on:click="attachMember(result)"
+                                                    class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50">
+                                                    <span class="min-w-0">
+                                                        <span class="block truncate text-sm font-medium text-slate-800" x-text="result.name"></span>
+                                                        <span class="block text-xs text-slate-400" x-text="result.phone"></span>
+                                                    </span>
+                                                    <span class="shrink-0 text-right text-xs text-slate-500">
+                                                        <span class="block" x-text="result.tier"></span>
+                                                        <span class="block"><span x-text="result.points_balance"></span> pts</span>
+                                                    </span>
+                                                </button>
+                                            </template>
+                                        </div>
+
+                                        <button type="button" x-show="!showEnrol" x-on:click="startEnrol()"
+                                            class="mt-2 text-xs font-medium text-brand-700 hover:underline">+ Sign up a new member</button>
+
+                                        <div x-show="showEnrol" x-cloak class="mt-2 space-y-2 rounded-lg bg-slate-50 p-3">
+                                            <input type="text" x-model="enrolName" x-on:keydown.enter.prevent placeholder="Name" class="form-input">
+                                            <input type="tel" x-model="enrolPhone" x-on:keydown.enter.prevent placeholder="Mobile number" class="form-input">
+                                            <label class="flex items-center gap-2 text-xs text-slate-600">
+                                                <input type="checkbox" x-model="enrolOptIn" class="rounded border-slate-300 text-brand-600">
+                                                Happy to receive offers
+                                            </label>
+                                            <p x-show="enrolError" x-cloak class="text-xs text-red-600" x-text="enrolError"></p>
+                                            <div class="flex gap-2">
+                                                <x-button type="button" size="sm" x-on:click="enrolMember()" x-bind:disabled="enrolling">Sign up &amp; attach</x-button>
+                                                <x-button type="button" size="sm" variant="ghost" x-on:click="showEnrol = false">Cancel</x-button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <template x-if="member">
+                                    <div>
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div class="min-w-0">
+                                                <a x-bind:href="member.url" target="_blank"
+                                                    class="block truncate text-sm font-semibold text-slate-900 hover:text-brand-700" x-text="member.name"></a>
+                                                <p class="text-xs text-slate-500">
+                                                    <span x-text="member.tier ?? 'Member'"></span> ·
+                                                    <span x-text="member.card ?? member.phone"></span>
+                                                </p>
+                                            </div>
+                                            <button type="button" x-on:click="detachMember()"
+                                                class="shrink-0 text-xs text-slate-400 hover:text-red-600">Remove</button>
+                                        </div>
+
+                                        <div class="mt-2 flex justify-between text-xs">
+                                            <span class="text-slate-500">Points balance</span>
+                                            <span class="font-semibold text-slate-800">
+                                                <span x-text="member.points_balance.toLocaleString()"></span> pts ·
+                                                {{ $symbol }}<span x-text="money(member.points_value)"></span>
+                                            </span>
+                                        </div>
+
+                                        <div x-show="loyalty.enabled && member.points_balance >= loyalty.min_redeem_points" class="mt-2">
+                                            <label for="redeem_points_input" class="form-label">Redeem points</label>
+                                            <div class="flex gap-2">
+                                                <input type="number" id="redeem_points_input" min="0" step="1" x-model="redeemPoints"
+                                                    x-on:keydown.enter.prevent placeholder="0" class="form-input text-right">
+                                                <button type="button" x-on:click="useMaxPoints()"
+                                                    class="shrink-0 rounded-lg border border-slate-300 px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                                                    Max <span x-text="redeemLimit.toLocaleString()"></span>
+                                                </button>
+                                            </div>
+                                            <p class="form-hint">
+                                                <span x-text="loyalty.min_redeem_points"></span> minimum · up to
+                                                <span x-text="loyalty.max_redeem_percent"></span>% of the bill
+                                            </p>
+                                        </div>
+
+                                        <p x-show="loyalty.enabled" class="mt-2 rounded bg-brand-50 px-2 py-1 text-[11px] text-brand-800">
+                                            Earns <strong x-text="pointsToEarn.toLocaleString()"></strong> points on this bill
+                                        </p>
+                                    </div>
+                                </template>
+                            </div>
+
                             <dl class="space-y-2 text-sm">
                                 <div class="flex justify-between">
                                     <dt class="text-slate-500">Items</dt>
@@ -220,6 +323,10 @@
                             </div>
 
                             <dl class="space-y-2 border-t border-slate-200 pt-3 text-sm">
+                                <div class="flex justify-between" x-show="loyaltyDiscount > 0" x-cloak>
+                                    <dt class="text-slate-500">Points redeemed (<span x-text="appliedRedeemPoints.toLocaleString()"></span>)</dt>
+                                    <dd class="font-medium text-brand-700">− {{ $symbol }}<span x-text="money(loyaltyDiscount)"></span></dd>
+                                </div>
                                 <div class="flex justify-between">
                                     <dt class="text-slate-500">Subtotal (excl. VAT)</dt>
                                     <dd class="font-medium text-slate-800">{{ $symbol }}<span x-text="money(breakdown.subtotal)"></span></dd>

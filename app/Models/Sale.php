@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\PaymentMethod;
 use App\Enums\SaleStatus;
+use App\Models\Concerns\BelongsToStore;
 use Database\Factories\SaleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,15 +16,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 #[Fillable([
-    'uuid', 'invoice_no', 'status', 'customer_name', 'customer_phone', 'customer_vat_number',
-    'items_gross', 'line_discount_total', 'bill_discount', 'subtotal_excl_vat', 'vat_total',
+    'uuid', 'invoice_no', 'status', 'customer_id', 'customer_name', 'customer_phone', 'customer_vat_number',
+    'items_gross', 'line_discount_total', 'bill_discount', 'loyalty_discount', 'subtotal_excl_vat', 'vat_total',
     'grand_total', 'cost_total', 'payment_method', 'amount_paid', 'change_due', 'notes',
+    'loyalty_points_earned', 'loyalty_points_redeemed', 'loyalty_balance_after',
     'cashier_id', 'sold_at', 'voided_by', 'voided_at', 'void_reason',
 ])]
 class Sale extends Model
 {
     /** @use HasFactory<SaleFactory> */
-    use HasFactory, HasUuids;
+    use BelongsToStore, HasFactory, HasUuids;
 
     /**
      * The bill is looked up publicly by its uuid, never by its id.
@@ -56,6 +58,10 @@ class Sale extends Model
             'items_gross' => 'decimal:2',
             'line_discount_total' => 'decimal:2',
             'bill_discount' => 'decimal:2',
+            'loyalty_discount' => 'decimal:2',
+            'loyalty_points_earned' => 'integer',
+            'loyalty_points_redeemed' => 'integer',
+            'loyalty_balance_after' => 'integer',
             'subtotal_excl_vat' => 'decimal:2',
             'vat_total' => 'decimal:2',
             'grand_total' => 'decimal:2',
@@ -71,6 +77,16 @@ class Sale extends Model
     public function items(): HasMany
     {
         return $this->hasMany(SaleItem::class);
+    }
+
+    /**
+     * The loyalty member the bill was rung up for, if any.
+     *
+     * @return BelongsTo<Customer, $this>
+     */
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
     }
 
     /**

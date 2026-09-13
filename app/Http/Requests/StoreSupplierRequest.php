@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\StoreContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -24,7 +25,10 @@ class StoreSupplierRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => ['required', 'string', 'max:32', Rule::unique('suppliers', 'code')->ignore($this->route('supplier'))],
+            'code' => [
+                'required', 'string', 'max:32',
+                Rule::unique('suppliers', 'code')->where('store_id', StoreContext::id())->ignore($this->route('supplier')),
+            ],
             'name' => ['required', 'string', 'max:150'],
             'contact_person' => ['nullable', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:20'],

@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\ProductType;
 use App\Enums\StorageType;
+use App\Support\StoreContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -29,8 +30,14 @@ class StoreProductRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:150'],
             'short_name' => ['nullable', 'string', 'max:60'],
-            'sku' => ['required', 'string', 'max:64', Rule::unique('products', 'sku')->ignore($this->route('product'))],
-            'barcode' => ['nullable', 'string', 'max:64', Rule::unique('products', 'barcode')->ignore($this->route('product'))],
+            'sku' => [
+                'required', 'string', 'max:64',
+                Rule::unique('products', 'sku')->where('store_id', StoreContext::id())->ignore($this->route('product')),
+            ],
+            'barcode' => [
+                'nullable', 'string', 'max:64',
+                Rule::unique('products', 'barcode')->where('store_id', StoreContext::id())->ignore($this->route('product')),
+            ],
             'type' => ['required', Rule::enum(ProductType::class)],
 
             'category_id' => ['required', 'exists:categories,id'],

@@ -11,6 +11,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\Unit;
+use App\Services\BarcodeGenerator;
 use App\Services\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +22,33 @@ use Illuminate\View\View;
 class ProductController extends Controller
 {
     public function __construct(protected InventoryService $inventory) {}
+
+    /**
+     * A print-ready A4 sheet of shelf labels. Products whose barcode is not a
+     * valid EAN-13 are left out — a scanner would refuse to read them, so a
+     * label would only waste the paper it is printed on.
+     */
+    public function labels(Request $request, BarcodeGenerator $barcodes): View
+    {
+        $this->authorize('manage-products');
+
+        $products = Product::query()
+            ->with(['category', 'unit'])
+            ->whereNotNull('barcode')
+            ->when($request->filled('category'), fn ($query) => $query->where('category_id', $request->integer('category')))
+            ->when($request->string('status')->toString() !== 'all', fn ($query) => $query->active())
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (Product $product): bool => $barcodes->isValidEan13($product->barcode))
+            ->values();
+
+        return view('products.labels', [
+            'products' => $products,
+            'barcodes' => $barcodes,
+            'categories' => Category::active()->orderBy('name')->get(),
+            'skipped' => Product::whereNotNull('barcode')->count() - $products->count(),
+        ]);
+    }
 
     /**
      * The searchable, filterable product list.

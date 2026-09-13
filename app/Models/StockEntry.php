@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\StockEntryType;
+use App\Models\Concerns\BelongsToStore;
 use Database\Factories\StockEntryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class StockEntry extends Model
 {
     /** @use HasFactory<StockEntryFactory> */
-    use HasFactory;
+    use BelongsToStore, HasFactory;
 
     /**
      * Get the attributes that should be cast.

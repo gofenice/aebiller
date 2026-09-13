@@ -48,6 +48,12 @@
                             'Gross profit' => config('inventory.currency_symbol').number_format($sale->profit(), 2),
                             'Cashier' => $sale->cashier?->name ?? '—',
                         ];
+
+                        if ($sale->customer) {
+                            $rows['Loyalty member'] = $sale->customer->name;
+                            $rows['Points redeemed'] = number_format($sale->loyalty_points_redeemed).' ('.config('inventory.currency_symbol').number_format((float) $sale->loyalty_discount, 2).')';
+                            $rows['Points earned'] = number_format($sale->loyalty_points_earned);
+                        }
                     @endphp
                     @foreach ($rows as $label => $value)
                         <div class="flex justify-between gap-4 px-5 py-2.5">

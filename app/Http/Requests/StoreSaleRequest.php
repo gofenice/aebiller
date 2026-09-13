@@ -32,6 +32,8 @@ class StoreSaleRequest extends FormRequest
             'customer_name' => ['nullable', 'string', 'max:120'],
             'customer_phone' => ['nullable', 'string', 'max:20'],
             'customer_vat_number' => ['nullable', 'string', 'max:20'],
+            'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
+            'redeem_points' => ['nullable', 'integer', 'min:0', 'max:10000000'],
             'notes' => ['nullable', 'string', 'max:500'],
 
             'items' => ['required', 'array', 'min:1'],

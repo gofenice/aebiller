@@ -44,6 +44,12 @@
                 <dd class="font-mono">{{ $sale->customer_vat_number }}</dd>
             </div>
         @endif
+        @if ($sale->customer?->activeCard)
+            <div class="flex justify-between">
+                <dt>Loyalty card</dt>
+                <dd class="font-mono">{{ $sale->customer->activeCard->maskedNumber() }}</dd>
+            </div>
+        @endif
     </dl>
 
     <table class="mt-3 w-full text-[11px]">
@@ -87,6 +93,12 @@
                 <dd>− {{ number_format((float) $sale->bill_discount, 2) }}</dd>
             </div>
         @endif
+        @if ((float) $sale->loyalty_discount > 0)
+            <div class="flex justify-between text-slate-600">
+                <dt>Points redeemed ({{ number_format($sale->loyalty_points_redeemed) }})</dt>
+                <dd>− {{ number_format((float) $sale->loyalty_discount, 2) }}</dd>
+            </div>
+        @endif
         <div class="flex justify-between text-slate-600">
             <dt>Total excluding VAT</dt>
             <dd>{{ number_format((float) $sale->subtotal_excl_vat, 2) }}</dd>
@@ -110,6 +122,25 @@
             </div>
         @endif
     </dl>
+
+    @if ($sale->customer_id !== null && $sale->loyalty_balance_after !== null)
+        <dl class="mt-3 space-y-1 border-t border-dashed border-slate-300 pt-3 text-[11px] text-slate-600">
+            <div class="flex justify-between">
+                <dt>Points earned on this bill</dt>
+                <dd class="font-medium text-slate-900">+{{ number_format($sale->loyalty_points_earned) }}</dd>
+            </div>
+            @if ($sale->loyalty_points_redeemed > 0)
+                <div class="flex justify-between">
+                    <dt>Points used</dt>
+                    <dd>−{{ number_format($sale->loyalty_points_redeemed) }}</dd>
+                </div>
+            @endif
+            <div class="flex justify-between font-semibold text-slate-900">
+                <dt>Points balance</dt>
+                <dd>{{ number_format($sale->loyalty_balance_after) }}</dd>
+            </div>
+        </dl>
+    @endif
 
     @if ($qrSvg)
         <div class="mt-4 flex flex-col items-center border-t border-dashed border-slate-300 pt-4">

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AdjustmentReason;
+use App\Models\Concerns\BelongsToStore;
 use Database\Factories\StockAdjustmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class StockAdjustment extends Model
 {
     /** @use HasFactory<StockAdjustmentFactory> */
-    use HasFactory;
+    use BelongsToStore, HasFactory;
 
     /**
      * Get the attributes that should be cast.

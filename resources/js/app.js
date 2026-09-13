@@ -282,6 +282,7 @@ Alpine.data('posTerminal', (config = {}) => ({
     results: [],
     highlight: -1,
     requestId: 0,
+    submitting: false,
     searching: false,
     notice: null,
     billDiscount: '',
@@ -291,6 +292,23 @@ Alpine.data('posTerminal', (config = {}) => ({
     customerPhone: '',
     customerVat: '',
     showCustomer: false,
+
+    // Loyalty member attached to the bill, and the box used to find one.
+    memberUrl: config.memberUrl,
+    enrolUrl: config.enrolUrl,
+    loyalty: config.loyalty ?? { enabled: false },
+    member: null,
+    memberQuery: '',
+    memberResults: [],
+    memberError: null,
+    memberRequestId: 0,
+    redeemPoints: '',
+    showEnrol: false,
+    enrolName: '',
+    enrolPhone: '',
+    enrolOptIn: false,
+    enrolError: null,
+    enrolling: false,
 
     init() {
         this.focusScanner();
@@ -310,6 +328,15 @@ Alpine.data('posTerminal', (config = {}) => ({
      * from here — a partial code must never pick an item on its own.
      */
     suggest() {
+        // A hardware scanner types the code and sends its Enter in the same
+        // breath, which leaves the typing's debounced suggestion scheduled
+        // behind it. Letting that suggestion run would supersede the scan
+        // still in flight and the item would never reach the basket, so a
+        // submission in progress wins.
+        if (this.submitting) {
+            return;
+        }
+
         this.lookup(false);
     },
 
@@ -334,9 +361,13 @@ Alpine.data('posTerminal', (config = {}) => ({
         const code = this.code.trim();
         const request = ++this.requestId;
 
+        this.submitting = addExactMatch;
+
         if (code.length < 2) {
             this.results = [];
             this.highlight = -1;
+            this.submitting = false;
+
             return;
         }
 
@@ -360,10 +391,24 @@ Alpine.data('posTerminal', (config = {}) => ({
                 return;
             }
 
+            // A loyalty card scanned into the product box attaches the member.
+            if (payload.member || payload.member_error) {
+                this.code = '';
+                payload.member ? this.attachMember(payload.member) : this.flash(payload.member_error);
+                this.focusScanner();
+
+                return;
+            }
+
             if (payload.match) {
                 this.addProduct(payload.match);
             } else if (this.results.length === 0) {
+                // A scanner sends a whole code at once; there is nothing to
+                // refine, so clear it rather than leave it for the next scan
+                // to be appended to.
+                this.code = '';
                 this.flash(`Nothing found for "${code}".`);
+                this.focusScanner();
             }
         } catch (error) {
             if (request === this.requestId) {
@@ -372,6 +417,10 @@ Alpine.data('posTerminal', (config = {}) => ({
         } finally {
             if (request === this.requestId) {
                 this.searching = false;
+            }
+
+            if (addExactMatch) {
+                this.submitting = false;
             }
         }
     },
@@ -390,23 +439,154 @@ Alpine.data('posTerminal', (config = {}) => ({
         this.highlight = -1;
     },
 
-    addProduct(product) {
-        if (product.current_stock <= 0) {
-            this.flash(`${product.name} is out of stock.`);
+    /**
+     * Find a loyalty member. A scanned card or a full mobile number resolves
+     * to one member and attaches straight away; a name offers a list.
+     *
+     * @param {boolean} attachSingle attach the only result when Enter was pressed
+     */
+    async searchMember(attachSingle) {
+        const term = this.memberQuery.trim();
+        const request = ++this.memberRequestId;
+
+        this.memberError = null;
+
+        if (term.length < 2) {
+            this.memberResults = [];
+
             return;
         }
 
+        try {
+            const response = await fetch(`${this.memberUrl}?q=${encodeURIComponent(term)}`, {
+                headers: { Accept: 'application/json' },
+            });
+            const payload = response.ok ? await response.json() : { match: null, results: [], error: null };
+
+            if (request !== this.memberRequestId) {
+                return;
+            }
+
+            if (payload.match) {
+                this.attachMember(payload.match);
+
+                return;
+            }
+
+            this.memberError = payload.error;
+            this.memberResults = payload.results ?? [];
+
+            if (attachSingle && this.memberResults.length === 1) {
+                this.attachMember(this.memberResults[0]);
+            } else if (attachSingle && this.memberResults.length === 0 && !payload.error) {
+                this.memberError = `No member found for "${term}".`;
+            }
+        } catch (error) {
+            if (request === this.memberRequestId) {
+                this.memberError = 'Could not reach the member lookup.';
+            }
+        }
+    },
+
+    attachMember(member) {
+        this.member = member;
+        this.memberQuery = '';
+        this.memberResults = [];
+        this.memberError = null;
+        this.redeemPoints = '';
+        this.showEnrol = false;
+        this.focusScanner();
+    },
+
+    detachMember() {
+        this.member = null;
+        this.redeemPoints = '';
+    },
+
+    /** Carry whatever was typed in the member box into the sign-up form. */
+    startEnrol() {
+        const typed = this.memberQuery.trim();
+
+        if (/^[\d\s+()-]+$/.test(typed)) {
+            this.enrolPhone = typed;
+        } else if (typed) {
+            this.enrolName = typed;
+        }
+
+        this.enrolError = null;
+        this.showEnrol = true;
+    },
+
+    async enrolMember() {
+        this.enrolling = true;
+        this.enrolError = null;
+
+        try {
+            const response = await fetch(this.enrolUrl, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+                body: JSON.stringify({
+                    name: this.enrolName,
+                    phone: this.enrolPhone,
+                    marketing_opt_in: this.enrolOptIn,
+                }),
+            });
+            const payload = await response.json();
+
+            if (!response.ok) {
+                this.enrolError = payload.errors
+                    ? Object.values(payload.errors).flat()[0]
+                    : (payload.message ?? 'Could not sign the member up.');
+
+                return;
+            }
+
+            this.enrolName = '';
+            this.enrolPhone = '';
+            this.enrolOptIn = false;
+            this.attachMember(payload.member);
+            this.flash(`${payload.member.name} is now a member — card ${payload.member.card}.`, 'success');
+        } catch (error) {
+            this.enrolError = 'Could not reach the server.';
+        } finally {
+            this.enrolling = false;
+        }
+    },
+
+    useMaxPoints() {
+        this.redeemPoints = this.redeemLimit >= this.loyalty.min_redeem_points ? String(this.redeemLimit) : '';
+    },
+
+    addProduct(product) {
+        // The code has resolved to a product, so it has served its purpose
+        // whether or not the item can be sold. Leaving it in the box would let
+        // the next scan append to it, and nothing would match after that.
         this.code = '';
         this.dismissSuggestions();
+
+        if (product.current_stock <= 0) {
+            this.flash(`${product.name} is out of stock.`);
+            this.focusScanner();
+
+            return;
+        }
+
         const line = this.cart.find((item) => item.id === product.id);
 
         if (line) {
             if (line.quantity + 1 > product.current_stock) {
                 this.flash(`Only ${product.current_stock} ${product.unit ?? ''} of ${product.name} left.`);
+                this.focusScanner();
+
                 return;
             }
             line.quantity = round2(line.quantity + 1);
             this.focusScanner();
+
             return;
         }
 
@@ -463,6 +643,11 @@ Alpine.data('posTerminal', (config = {}) => ({
         this.customerName = '';
         this.customerPhone = '';
         this.customerVat = '';
+        this.detachMember();
+        this.memberQuery = '';
+        this.memberResults = [];
+        this.memberError = null;
+        this.showEnrol = false;
         this.dismissSuggestions();
         this.focusScanner();
     },
@@ -499,10 +684,50 @@ Alpine.data('posTerminal', (config = {}) => ({
         return round2(Math.min(Math.max(Number(this.billDiscount || 0), 0), this.afterLineDiscount));
     },
 
-    /** VAT split per line, with the bill discount spread pro-rata. */
+    /** What is left to pay before points — the base the redemption cap is taken from. */
+    get payableBeforePoints() {
+        return round2(this.afterLineDiscount - this.appliedBillDiscount);
+    },
+
+    /** Mirrors LoyaltyService::redeemableFor(). */
+    get redeemLimit() {
+        if (!this.member || !this.loyalty.enabled || !(this.loyalty.point_value > 0)) {
+            return 0;
+        }
+
+        const cap = this.payableBeforePoints * this.loyalty.max_redeem_percent / 100;
+        const byCap = Math.floor(Math.round(cap / this.loyalty.point_value * 10000) / 10000);
+
+        return Math.max(0, Math.min(this.member.points_balance, byCap));
+    },
+
+    get appliedRedeemPoints() {
+        return this.member ? Math.max(0, Math.floor(Number(this.redeemPoints || 0))) : 0;
+    },
+
+    get loyaltyDiscount() {
+        if (this.appliedRedeemPoints <= 0) {
+            return 0;
+        }
+
+        return round2(Math.min(round2(this.appliedRedeemPoints * this.loyalty.point_value), this.payableBeforePoints));
+    },
+
+    /** Mirrors LoyaltyService::pointsFor(): earned on the total actually paid. */
+    get pointsToEarn() {
+        if (!this.member || !this.loyalty.enabled) {
+            return 0;
+        }
+
+        const raw = this.grandTotal * this.loyalty.points_per_currency * this.member.multiplier;
+
+        return Math.floor(Math.round(raw * 10000) / 10000);
+    },
+
+    /** VAT split per line, with the bill discount and redeemed points spread pro-rata. */
     get breakdown() {
         const base = this.afterLineDiscount;
-        const discount = this.appliedBillDiscount;
+        const discount = round2(this.appliedBillDiscount + this.loyaltyDiscount);
         let distributed = 0;
         let subtotal = 0;
         let vat = 0;
@@ -574,6 +799,20 @@ Alpine.data('posTerminal', (config = {}) => ({
 
         if (short) {
             return `${short.name} has only ${short.current_stock} ${short.unit ?? ''} in stock.`;
+        }
+
+        if (this.appliedRedeemPoints > 0) {
+            if (this.appliedRedeemPoints < this.loyalty.min_redeem_points) {
+                return `Points are redeemed ${this.loyalty.min_redeem_points} at a time or more.`;
+            }
+
+            if (this.appliedRedeemPoints > this.member.points_balance) {
+                return `${this.member.name} has only ${this.member.points_balance} points.`;
+            }
+
+            if (this.appliedRedeemPoints > this.redeemLimit) {
+                return `At most ${this.redeemLimit} points can be used on this bill.`;
+            }
         }
 
         if (this.needsTendering && this.amountPaid !== '' && this.shortfall > 0) {

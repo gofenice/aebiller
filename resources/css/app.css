@@ -18,6 +18,31 @@
     --color-brand-800: oklch(0.432 0.095 166.913);
     --color-brand-900: oklch(0.378 0.077 168.94);
     --color-brand-950: oklch(0.262 0.051 172.552);
+
+    /* AE Biller, taken straight from the logo: #C1272D and #333333. */
+    --color-ae-50: #fef3f3;
+    --color-ae-100: #fde3e4;
+    --color-ae-200: #fbcbcd;
+    --color-ae-300: #f7a3a7;
+    --color-ae-400: #ef7076;
+    --color-ae-500: #e2424a;
+    --color-ae-600: #c1272d;
+    --color-ae-700: #a41f25;
+    --color-ae-800: #881d22;
+    --color-ae-900: #731d21;
+    --color-ae-950: #3f0b0d;
+
+    --color-ink-50: #f7f7f7;
+    --color-ink-100: #ededed;
+    --color-ink-200: #dfdfdf;
+    --color-ink-300: #c8c8c8;
+    --color-ink-400: #a3a3a3;
+    --color-ink-500: #7d7d7d;
+    --color-ink-600: #5f5f5f;
+    --color-ink-700: #4d4d4d;
+    --color-ink-800: #3f3f3f;
+    --color-ink-900: #333333;
+    --color-ink-950: #1c1c1c;
 }
 
 @layer base {
@@ -55,6 +80,23 @@
 
     .table-head {
         @apply px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase;
+    }
+
+    /* The slanted bars of the logo, reused as a background motif. */
+    .ae-slashes {
+        background-image: repeating-linear-gradient(
+            115deg,
+            rgba(255, 255, 255, 0.05) 0 2px,
+            transparent 2px 22px
+        );
+    }
+
+    .ae-rule {
+        @apply block h-1 w-12 skew-x-[-25deg] bg-ae-600;
+    }
+
+    .ae-label {
+        @apply text-xs font-semibold tracking-[0.2em] text-ae-600 uppercase;
     }
 }
 
