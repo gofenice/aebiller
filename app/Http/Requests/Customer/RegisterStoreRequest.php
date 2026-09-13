@@ -46,7 +46,9 @@ class RegisterStoreRequest extends FormRequest
                 }),
             ],
             'period' => ['nullable', Rule::in(['monthly', 'yearly'])],
-            'currency_code' => ['required', Rule::in(array_keys(config('tenancy.currencies')))],
+            // No currency here: it comes from the switcher on the public site,
+            // so there is only one answer and it cannot contradict the prices
+            // the shop was just quoted.
             'timezone' => ['required', Rule::in(config('tenancy.timezones'))],
             'terms' => ['accepted'],
         ];
@@ -82,7 +84,6 @@ class RegisterStoreRequest extends FormRequest
     {
         $this->merge([
             'slug' => Str::slug(Str::lower($this->string('slug')->toString())),
-            'currency_code' => $this->filled('currency_code') ? $this->string('currency_code')->toString() : config('tenancy.defaults.currency_code'),
             'timezone' => $this->filled('timezone') ? $this->string('timezone')->toString() : config('tenancy.defaults.timezone'),
         ]);
     }

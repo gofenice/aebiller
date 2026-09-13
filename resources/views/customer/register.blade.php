@@ -89,27 +89,21 @@
                         @error('slug') <p class="mt-1 text-xs font-medium text-ae-700">{{ $message }}</p> @enderror
                     </div>
 
-                    <div class="grid gap-5 sm:grid-cols-2">
-                        <div>
-                            <label for="currency_code" class="form-label">Currency</label>
-                            {{-- Not $currency: that holds the currency prices are
-                                 quoted in, and a foreach variable outlives its loop. --}}
-                            <select name="currency_code" id="currency_code" class="form-input pr-8">
-                                @foreach (config('tenancy.currencies') as $code => $option)
-                                    <option value="{{ $code }}" @selected(old('currency_code', config('tenancy.defaults.currency_code')) === $code)>
-                                        {{ $code }} — {{ $option['name'] }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label for="timezone" class="form-label">Time zone</label>
-                            <select name="timezone" id="timezone" class="form-input pr-8">
-                                @foreach (config('tenancy.timezones') as $timezone)
-                                    <option value="{{ $timezone }}" @selected(old('timezone', config('tenancy.defaults.timezone')) === $timezone)>{{ $timezone }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <div>
+                        <label for="timezone" class="form-label">Time zone</label>
+                        <select name="timezone" id="timezone" class="form-input pr-8">
+                            @foreach (config('tenancy.timezones') as $timezone)
+                                <option value="{{ $timezone }}" @selected(old('timezone', config('tenancy.defaults.timezone')) === $timezone)>{{ $timezone }}</option>
+                            @endforeach
+                        </select>
+                        {{-- No currency box: the switcher at the top of the page
+                             already chose it, and asking twice only invites the
+                             two answers to disagree. --}}
+                        <p class="form-hint">
+                            Your shop will trade and be billed in
+                            <strong>{{ \App\Support\DisplayCurrency::nameOf($currency) }} ({{ $currency }})</strong> —
+                            change it with the currency switcher at the top of the page.
+                        </p>
                     </div>
                 </fieldset>
 

@@ -13,6 +13,7 @@ use App\Models\StoreInvoice;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\BillingCycle;
+use App\Support\DisplayCurrency;
 use App\Support\StoreContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -52,7 +53,7 @@ class StoreRegistrationTest extends TestCase
             'owner_phone' => '0551112223',
             'password' => 'a-good-password',
             'password_confirmation' => 'a-good-password',
-            'currency_code' => 'SAR',
+            // No currency_code: it comes from the switcher, not the form.
             'timezone' => 'Asia/Riyadh',
             'terms' => '1',
             ...$overrides,
@@ -70,7 +71,8 @@ class StoreRegistrationTest extends TestCase
         $response->assertRedirect($this->app('/welcome/al-noor'));
         $this->assertSame(StoreStatus::Active, $store->status);
         $this->assertSame($plan->id, $store->plan_id);
-        $this->assertSame('SAR', $store->currency_code);
+        // Nothing was posted for it: the shop trades in the base currency.
+        $this->assertSame(config('tenancy.base_currency'), $store->currency_code);
 
         // Three days free, and the first invoice falls due the day it ends.
         $this->assertTrue($store->trial_ends_on->isSameDay(today()->addDays(3)));
@@ -88,6 +90,20 @@ class StoreRegistrationTest extends TestCase
             $this->assertGreaterThan(0, ExpenseCategory::count());
             $this->assertSame(4, LoyaltyTier::count());
         });
+    }
+
+    public function test_the_currency_chosen_on_the_public_site_is_the_one_the_shop_gets(): void
+    {
+        // Picked with the switcher before signing up: it settles what the shop
+        // trades in, what its receipts show, and what it is billed in.
+        $this->withCookie(DisplayCurrency::COOKIE, 'SAR')
+            ->post($this->app('/register'), $this->form());
+
+        $store = Store::where('slug', 'al-noor')->firstOrFail();
+
+        $this->assertSame('SAR', $store->currency_code);
+        $this->assertSame('SAR', $store->billing_currency);
+        $this->assertSame('SAR ', $store->currency_symbol);
     }
 
     public function test_the_owner_can_sign_in_at_their_new_address(): void

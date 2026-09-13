@@ -79,7 +79,9 @@ class RegistrationController extends Controller
         $period = ($validated['period'] ?? null) === 'yearly' && $plan?->offersYearly()
             ? BillingPeriod::Yearly
             : ($plan?->billing_period ?? BillingPeriod::Monthly);
-        $currency = config('tenancy.currencies.'.$validated['currency_code']);
+        // One currency throughout: what the shop was quoted is what it trades
+        // in and what it is billed in.
+        $currencyCode = DisplayCurrency::current();
         $trialEndsOn = today()->addDays(config('tenancy.trial_days'));
 
         $store = Store::create([
@@ -89,8 +91,8 @@ class RegistrationController extends Controller
             'owner_name' => $validated['owner_name'],
             'owner_email' => $validated['owner_email'],
             'owner_phone' => $validated['owner_phone'] ?? null,
-            'currency_code' => $validated['currency_code'],
-            'currency_symbol' => $currency['symbol'] ?? config('tenancy.defaults.currency_symbol'),
+            'currency_code' => $currencyCode,
+            'currency_symbol' => DisplayCurrency::symbolOf($currencyCode),
             'timezone' => $validated['timezone'],
             'expiry_alert_days' => config('tenancy.defaults.expiry_alert_days'),
             'tax_rates' => config('tenancy.defaults.tax_rates'),
@@ -98,7 +100,7 @@ class RegistrationController extends Controller
 
             // Billed in the currency and on the period the prices were quoted
             // in, so the first invoice is for the figure they agreed to.
-            'billing_currency' => DisplayCurrency::current(),
+            'billing_currency' => $currencyCode,
             'billing_period' => $period,
 
             // Free until the trial ends; the first invoice is due that day.
