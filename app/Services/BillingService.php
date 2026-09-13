@@ -6,6 +6,7 @@ use App\Enums\MovementType;
 use App\Enums\PaymentMethod;
 use App\Enums\SaleStatus;
 use App\Models\Customer;
+use App\Models\LoyaltyRedemptionOtp;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
@@ -24,6 +25,7 @@ class BillingService
     public function __construct(
         protected InventoryService $inventory,
         protected LoyaltyService $loyalty,
+        protected WhatsAppGateway $whatsapp,
     ) {}
 
     /**
@@ -49,8 +51,13 @@ class BillingService
             }
 
             $pointsRedeemed = $customer !== null ? (int) ($attributes['redeem_points'] ?? 0) : 0;
+            $approval = null;
 
             if ($pointsRedeemed > 0) {
+                // Inside the transaction and locked, so the same approval
+                // cannot settle two bills at once.
+                $approval = $this->approvalFor($customer, $pointsRedeemed, $attributes['redemption_otp_id'] ?? null);
+
                 $totals = $priced['totals'];
                 $payable = round($totals['items_gross'] - $totals['line_discount_total'] - $totals['bill_discount'], 2);
                 $loyaltyDiscount = $this->loyalty->redemptionDiscount($customer, $pointsRedeemed, $payable);
@@ -132,8 +139,38 @@ class BillingService
                 $this->loyalty->recordSale($sale, $customer, $pointsRedeemed, $cashier);
             }
 
+            // Spent: this approval can never authorise another redemption.
+            $approval?->forceFill(['consumed_at' => now(), 'sale_id' => $sale->id])->save();
+
             return $sale->fresh(['items', 'cashier']);
         });
+    }
+
+    /**
+     * The approval that lets this member's points be spent.
+     *
+     * Where WhatsApp is set up, a member confirms their own redemption with a
+     * code, so a found card is worthless on its own. Where it is not set up
+     * there is no way to send a code, and redemption carries on as it did
+     * before — a code that cannot be delivered must not close the till.
+     */
+    protected function approvalFor(Customer $customer, int $points, mixed $otpId): ?LoyaltyRedemptionOtp
+    {
+        if (! $this->whatsapp->enabled()) {
+            return null;
+        }
+
+        $otp = filled($otpId)
+            ? LoyaltyRedemptionOtp::where('customer_id', $customer->id)->lockForUpdate()->find($otpId)
+            : null;
+
+        if ($otp === null || ! $otp->isApprovalFor($customer, $points)) {
+            throw new RuntimeException(
+                "{$customer->name} needs to confirm this redemption with the code sent to their WhatsApp."
+            );
+        }
+
+        return $otp;
     }
 
     /**

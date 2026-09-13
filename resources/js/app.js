@@ -310,6 +310,20 @@ Alpine.data('posTerminal', (config = {}) => ({
     enrolError: null,
     enrolling: false,
 
+    // The code the member confirms their own redemption with.
+    otpSendUrl: config.otpSendUrl,
+    otpVerifyUrl: config.otpVerifyUrl,
+    otpOverrideUrl: config.otpOverrideUrl,
+    otpRequired: Boolean(config.otpRequired),
+    otpId: null,
+    otpSent: false,
+    otpVerified: false,
+    otpCode: '',
+    otpSentTo: '',
+    otpError: null,
+    otpSending: false,
+    otpApprovedFor: 0,
+
     init() {
         this.focusScanner();
     },
@@ -495,12 +509,126 @@ Alpine.data('posTerminal', (config = {}) => ({
         this.memberError = null;
         this.redeemPoints = '';
         this.showEnrol = false;
+        // A code belongs to the member it was sent to: swapping members must
+        // never carry one person's approval onto another's points.
+        this.resetRedemptionCode();
         this.focusScanner();
     },
 
     detachMember() {
         this.member = null;
         this.redeemPoints = '';
+        this.resetRedemptionCode();
+    },
+
+    resetRedemptionCode() {
+        this.otpId = null;
+        this.otpSent = false;
+        this.otpVerified = false;
+        this.otpCode = '';
+        this.otpSentTo = '';
+        this.otpError = null;
+        this.otpApprovedFor = 0;
+    },
+
+    /** Send the member a code for the points currently being redeemed. */
+    async sendRedemptionCode() {
+        if (this.appliedRedeemPoints <= 0) {
+            return;
+        }
+
+        this.otpSending = true;
+        this.otpError = null;
+
+        try {
+            const payload = await this.postJson(this.otpSendUrl, {
+                customer_id: this.member.id,
+                points: this.appliedRedeemPoints,
+            });
+
+            if (!payload.ok) {
+                this.otpError = payload.body.message ?? 'Could not send the code.';
+
+                return;
+            }
+
+            this.otpId = payload.body.otp_id;
+            this.otpSent = true;
+            this.otpSentTo = payload.body.sent_to;
+            this.otpApprovedFor = this.appliedRedeemPoints;
+        } catch (error) {
+            this.otpError = 'Could not reach the server to send the code.';
+        } finally {
+            this.otpSending = false;
+        }
+    },
+
+    async verifyRedemptionCode() {
+        this.otpError = null;
+
+        try {
+            const payload = await this.postJson(this.otpVerifyUrl, {
+                otp_id: this.otpId,
+                code: this.otpCode,
+            });
+
+            if (!payload.ok) {
+                this.otpError = payload.body.message ?? 'That code was not accepted.';
+
+                return;
+            }
+
+            this.otpVerified = true;
+            this.otpApprovedFor = this.appliedRedeemPoints;
+        } catch (error) {
+            this.otpError = 'Could not reach the server to check the code.';
+        }
+    },
+
+    /** The owner approves without a code, because one could not be delivered. */
+    async overrideRedemptionCode() {
+        const reason = window.prompt('Why is this being approved without a code?');
+
+        if (!reason) {
+            return;
+        }
+
+        this.otpError = null;
+
+        try {
+            const payload = await this.postJson(this.otpOverrideUrl, {
+                customer_id: this.member.id,
+                points: this.appliedRedeemPoints,
+                reason,
+            });
+
+            if (!payload.ok) {
+                this.otpError = payload.body.message ?? 'Could not approve the redemption.';
+
+                return;
+            }
+
+            this.otpId = payload.body.otp_id;
+            this.otpSent = true;
+            this.otpVerified = true;
+            this.otpApprovedFor = this.appliedRedeemPoints;
+        } catch (error) {
+            this.otpError = 'Could not reach the server.';
+        }
+    },
+
+    async postJson(url, body) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: JSON.stringify(body),
+        });
+
+        return { ok: response.ok, body: await response.json() };
     },
 
     /** Carry whatever was typed in the member box into the sign-up form. */
@@ -648,6 +776,7 @@ Alpine.data('posTerminal', (config = {}) => ({
         this.memberResults = [];
         this.memberError = null;
         this.showEnrol = false;
+        this.resetRedemptionCode();
         this.dismissSuggestions();
         this.focusScanner();
     },
@@ -812,6 +941,18 @@ Alpine.data('posTerminal', (config = {}) => ({
 
             if (this.appliedRedeemPoints > this.redeemLimit) {
                 return `At most ${this.redeemLimit} points can be used on this bill.`;
+            }
+
+            // The server refuses an unconfirmed redemption anyway; saying so
+            // here means the cashier finds out before taking the money.
+            if (this.otpRequired && !this.otpVerified) {
+                return `${this.member.name} needs to confirm these points with the code sent to their WhatsApp.`;
+            }
+
+            // Raising the points after confirming goes beyond what the member
+            // approved, so it has to be confirmed again.
+            if (this.otpRequired && this.appliedRedeemPoints > this.otpApprovedFor) {
+                return `The code confirmed ${this.otpApprovedFor} points — send a new one for ${this.appliedRedeemPoints}.`;
             }
         }
 

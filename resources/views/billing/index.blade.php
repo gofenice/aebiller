@@ -8,6 +8,10 @@
             memberUrl: '{{ route('billing.member') }}',
             enrolUrl: '{{ route('billing.member.store') }}',
             loyalty: {{ Js::from($loyalty) }},
+            otpSendUrl: '{{ route('billing.otp.send') }}',
+            otpVerifyUrl: '{{ route('billing.otp.verify') }}',
+            otpOverrideUrl: '{{ route('billing.otp.override') }}',
+            otpRequired: {{ Js::from($whatsappEnabled) }},
         })"
         x-on:keydown.escape="code = ''; dismissSuggestions(); focusScanner()">
 
@@ -204,6 +208,7 @@
                         <div class="space-y-4 p-5">
                             <input type="hidden" name="customer_id" x-bind:value="member ? member.id : ''">
                             <input type="hidden" name="redeem_points" x-bind:value="appliedRedeemPoints || ''">
+                            <input type="hidden" name="redemption_otp_id" x-bind:value="otpId || ''">
 
                             {{-- Loyalty member: scan the card here or into the product box, or type the mobile number. --}}
                             <div class="rounded-lg border border-slate-200 p-3">
@@ -290,6 +295,54 @@
                                                 <span x-text="loyalty.min_redeem_points"></span> minimum · up to
                                                 <span x-text="loyalty.max_redeem_percent"></span>% of the bill
                                             </p>
+
+                                            {{-- The member confirms their own points being spent. Only
+                                                 shown where WhatsApp is set up: with no way to send a
+                                                 code, asking for one would just close the till. --}}
+                                            @if ($whatsappEnabled)
+                                                <div x-show="redeemPoints > 0" x-cloak class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                                    <template x-if="!otpId">
+                                                        <div>
+                                                            <button type="button" x-on:click="sendRedemptionCode()"
+                                                                x-bind:disabled="otpSending"
+                                                                class="w-full rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50">
+                                                                <span x-show="!otpSending">Send code to member's WhatsApp</span>
+                                                                <span x-show="otpSending" x-cloak>Sending…</span>
+                                                            </button>
+                                                            <p class="form-hint">Their points cannot be spent without it.</p>
+                                                        </div>
+                                                    </template>
+
+                                                    <template x-if="otpSent && !otpVerified">
+                                                        <div>
+                                                            <label for="otp_code" class="form-label">Code from the member</label>
+                                                            <div class="flex gap-2">
+                                                                <input type="text" id="otp_code" inputmode="numeric" maxlength="6"
+                                                                    x-model="otpCode" x-on:keydown.enter.prevent="verifyRedemptionCode()"
+                                                                    placeholder="6 digits" class="form-input text-center font-mono tracking-widest">
+                                                                <button type="button" x-on:click="verifyRedemptionCode()"
+                                                                    class="shrink-0 rounded-lg border border-slate-300 px-3 text-xs font-medium text-slate-700 hover:bg-white">
+                                                                    Confirm
+                                                                </button>
+                                                            </div>
+                                                            <p class="form-hint">Sent to <span x-text="otpSentTo"></span></p>
+                                                        </div>
+                                                    </template>
+
+                                                    <p x-show="otpVerified" x-cloak class="text-xs font-medium text-emerald-700">
+                                                        ✓ Confirmed — the points can be used on this bill.
+                                                    </p>
+                                                    <p x-show="otpError" x-cloak class="mt-1.5 text-xs text-red-600" x-text="otpError"></p>
+
+                                                    @can('manage-subscription')
+                                                        <button type="button" x-show="otpError && !otpVerified" x-cloak
+                                                            x-on:click="overrideRedemptionCode()"
+                                                            class="mt-1.5 text-xs font-medium text-slate-500 underline hover:text-slate-800">
+                                                            Owner: approve without a code
+                                                        </button>
+                                                    @endcan
+                                                </div>
+                                            @endif
                                         </div>
 
                                         <p x-show="loyalty.enabled" class="mt-2 rounded bg-brand-50 px-2 py-1 text-[11px] text-brand-800">

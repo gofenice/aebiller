@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'name', 'slug', 'legal_name', 'status', 'suspension_reason', 'suspended_at',
     'owner_name', 'owner_email', 'owner_phone', 'currency_code', 'currency_symbol',
-    'timezone', 'vat_number', 'address', 'phone', 'email', 'expiry_alert_days',
+    'timezone', 'phone_country_code', 'vat_number', 'address', 'phone', 'email', 'expiry_alert_days',
     'tax_rates', 'trial_ends_on', 'notes',
     // What this store pays the platform.
     'plan_id', 'monthly_fee', 'billing_currency', 'billing_period', 'billing_day',

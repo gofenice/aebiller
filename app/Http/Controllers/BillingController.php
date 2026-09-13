@@ -12,6 +12,7 @@ use App\Services\BillingService;
 use App\Services\InventoryService;
 use App\Services\LoyaltyService;
 use App\Services\PlanLimits;
+use App\Services\WhatsAppGateway;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,6 +47,9 @@ class BillingController extends Controller
                 ->get(),
             'categories' => Category::active()->orderBy('name')->get(),
             'loyalty' => LoyaltySetting::current()->forTill(),
+            // With no way to send a code there is nothing to ask for, so the
+            // till does not pretend otherwise.
+            'whatsappEnabled' => app(WhatsAppGateway::class)->enabled(),
         ]);
     }
 

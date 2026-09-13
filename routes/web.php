@@ -14,6 +14,7 @@ use App\Http\Controllers\LoyaltySettingController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PublicBillController;
 use App\Http\Controllers\PublicMemberController;
+use App\Http\Controllers\RedemptionOtpController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\StockAdjustmentController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\TillMemberController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WhatsAppBillController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -67,9 +69,16 @@ Route::middleware('auth:web')->group(function (): void {
     Route::get('billing/member', [TillMemberController::class, 'lookup'])->name('billing.member');
     Route::post('billing/member', [TillMemberController::class, 'store'])->name('billing.member.store');
 
+    // The code a member confirms their own redemption with, so a found card
+    // cannot be spent without their handset.
+    Route::post('billing/redemption-code', [RedemptionOtpController::class, 'send'])->name('billing.otp.send');
+    Route::post('billing/redemption-code/verify', [RedemptionOtpController::class, 'verify'])->name('billing.otp.verify');
+    Route::post('billing/redemption-code/override', [RedemptionOtpController::class, 'override'])->name('billing.otp.override');
+
     Route::get('sales', [SaleController::class, 'index'])->name('sales.index');
     Route::get('sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
     Route::delete('sales/{sale}', [SaleController::class, 'destroy'])->name('sales.destroy');
+    Route::post('sales/{sale}/whatsapp', WhatsAppBillController::class)->name('sales.whatsapp');
 
     // Loyalty members and their cards
     Route::get('customers/cards', [LoyaltyCardController::class, 'sheet'])->name('customers.cards');

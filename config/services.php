@@ -49,6 +49,38 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp (Meta Cloud API)
+    |--------------------------------------------------------------------------
+    |
+    | Sends the customer their bill, and the one-time code that authorises a
+    | points redemption. Without a token nothing is sent: the bill button is
+    | hidden and redemption carries on as it did before, because a code that
+    | cannot be delivered must not be allowed to block the till.
+    |
+    | Both messages go out as approved templates — Meta does not allow free
+    | text to someone who has not written to you in the last 24 hours.
+    |
+    */
+
+    'whatsapp' => [
+        'token' => env('WHATSAPP_TOKEN'),
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+        'base_url' => env('WHATSAPP_BASE_URL', 'https://graph.facebook.com'),
+        'api_version' => env('WHATSAPP_API_VERSION', 'v21.0'),
+
+        'bill_template' => env('WHATSAPP_BILL_TEMPLATE', 'bill_copy'),
+        'otp_template' => env('WHATSAPP_OTP_TEMPLATE', 'redeem_otp'),
+        'language' => env('WHATSAPP_TEMPLATE_LANGUAGE', 'en'),
+
+        // Dialling code used when a shop has not set its own and the number
+        // was typed without one.
+        'default_country_code' => env('WHATSAPP_DEFAULT_COUNTRY_CODE', '91'),
+
+        'otp_minutes' => (int) env('WHATSAPP_OTP_MINUTES', 5),
+    ],
+
     'razorpay' => [
         'key' => env('RAZORPAY_KEY_ID'),
         'secret' => env('RAZORPAY_KEY_SECRET'),

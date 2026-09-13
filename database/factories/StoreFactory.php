@@ -32,6 +32,9 @@ class StoreFactory extends Factory
             'currency_code' => $defaults['currency_code'],
             'currency_symbol' => $defaults['currency_symbol'],
             'timezone' => $defaults['timezone'],
+            // Members' numbers are typed locally; this is what turns one into
+            // the international number WhatsApp needs.
+            'phone_country_code' => $defaults['phone_country_code'] ?? '966',
             'expiry_alert_days' => $defaults['expiry_alert_days'],
             'tax_rates' => $defaults['tax_rates'],
         ];

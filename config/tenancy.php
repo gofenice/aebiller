@@ -87,6 +87,8 @@ return [
         'currency_code' => 'USD',
         'currency_symbol' => '$',
         'timezone' => 'Asia/Riyadh',
+        // Dialling code for members' mobile numbers, which shops type locally.
+        'phone_country_code' => '966',
         'expiry_alert_days' => 30,
         'tax_rates' => [0, 15],
     ],

@@ -5,6 +5,12 @@
             :back="route('sales.index')">
             <x-slot:actions>
                 <x-button type="button" variant="secondary" onclick="window.print()">🖨 Print bill</x-button>
+                @if ($whatsappEnabled && $sale->customer_phone)
+                    <form method="POST" action="{{ route('sales.whatsapp', $sale) }}" class="inline">
+                        @csrf
+                        <x-button type="submit" variant="secondary">Send on WhatsApp</x-button>
+                    </form>
+                @endif
                 <x-button :href="route('billing.create')">+ New sale</x-button>
             </x-slot:actions>
         </x-page-header>

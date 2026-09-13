@@ -8,6 +8,7 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Services\BillingService;
 use App\Services\QrCodeGenerator;
+use App\Services\WhatsAppGateway;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -75,6 +76,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'publicUrl' => $sale->publicUrl(),
             'qrSvg' => $qr->svg($sale->publicUrl(), 150),
+            'whatsappEnabled' => app(WhatsAppGateway::class)->enabled(),
         ]);
     }
 

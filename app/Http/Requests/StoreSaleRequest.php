@@ -34,6 +34,9 @@ class StoreSaleRequest extends FormRequest
             'customer_vat_number' => ['nullable', 'string', 'max:20'],
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'redeem_points' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            // The code the member approved this redemption with. Checked again
+            // against the member and the points when the bill is written.
+            'redemption_otp_id' => ['nullable', 'integer', 'exists:loyalty_redemption_otps,id'],
             'notes' => ['nullable', 'string', 'max:500'],
 
             'items' => ['required', 'array', 'min:1'],
