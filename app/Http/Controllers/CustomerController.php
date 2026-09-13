@@ -9,6 +9,7 @@ use App\Models\LoyaltySetting;
 use App\Models\LoyaltyTier;
 use App\Services\BarcodeGenerator;
 use App\Services\LoyaltyService;
+use App\Services\PlanLimits;
 use App\Services\QrCodeGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -80,8 +81,12 @@ class CustomerController extends Controller
     /**
      * Enrol: the member gets a card number and the welcome bonus straight away.
      */
-    public function store(StoreCustomerRequest $request): RedirectResponse
+    public function store(StoreCustomerRequest $request, PlanLimits $limits): RedirectResponse
     {
+        if ($blocked = $limits->reasonToBlock('max_customers')) {
+            return back()->withInput()->with('error', $blocked);
+        }
+
         $customer = $this->loyalty->enrol($request->validated(), $request->user());
 
         return redirect()

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Platform;
 
+use App\Enums\BillingPeriod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Platform\SavePlanRequest;
 use App\Models\Plan;
@@ -21,7 +22,14 @@ class PlanController extends Controller
     public function create(): View
     {
         return view('platform.plans.form', [
-            'plan' => new Plan(['currency_code' => config('tenancy.defaults.currency_code'), 'is_active' => true]),
+            'plan' => new Plan([
+                'currency_code' => config('tenancy.base_currency'),
+                'billing_period' => BillingPeriod::Monthly,
+                'yearly_discount_percent' => 20,
+                'is_active' => true,
+                'is_public' => true,
+                'is_free' => false,
+            ]),
         ]);
     }
 

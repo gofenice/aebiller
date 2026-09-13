@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Customer;
 
+use App\Enums\BillingPeriod;
 use App\Enums\StoreStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\RegisterStoreRequest;
@@ -27,8 +28,9 @@ class RegistrationController extends Controller
     public function create(Request $request): View
     {
         return view('customer.register', [
-            'plans' => Plan::query()->active()->ordered()->with('prices')->get(),
+            'plans' => Plan::query()->active()->public()->ordered()->with('prices')->get(),
             'chosenPlan' => $request->string('plan')->toString(),
+            'chosenPeriod' => $request->string('period')->toString() === 'yearly' ? 'yearly' : 'monthly',
             'trialDays' => config('tenancy.trial_days'),
             'currency' => DisplayCurrency::current(),
         ]);
@@ -70,7 +72,13 @@ class RegistrationController extends Controller
 
         // Never leave a shop on no plan at all: that is a zero fee, which is
         // never invoiced, which is a free account nobody meant to give away.
-        $plan ??= Plan::query()->active()->ordered()->first();
+        $plan ??= Plan::query()->active()->public()->ordered()->first();
+
+        // Yearly only where the plan actually offers it, so a hand-edited form
+        // cannot put a shop on a period it is not priced for.
+        $period = ($validated['period'] ?? null) === 'yearly' && $plan?->offersYearly()
+            ? BillingPeriod::Yearly
+            : ($plan?->billing_period ?? BillingPeriod::Monthly);
         $currency = config('tenancy.currencies.'.$validated['currency_code']);
         $trialEndsOn = today()->addDays(config('tenancy.trial_days'));
 
@@ -88,9 +96,10 @@ class RegistrationController extends Controller
             'tax_rates' => config('tenancy.defaults.tax_rates'),
             'plan_id' => $plan?->id,
 
-            // Billed in the currency the prices were quoted in, so the first
-            // invoice is for the figure they agreed to on the way in.
+            // Billed in the currency and on the period the prices were quoted
+            // in, so the first invoice is for the figure they agreed to.
             'billing_currency' => DisplayCurrency::current(),
+            'billing_period' => $period,
 
             // Free until the trial ends; the first invoice is due that day.
             'trial_ends_on' => $trialEndsOn,

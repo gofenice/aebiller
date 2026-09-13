@@ -31,9 +31,20 @@
                             <tr class="hover:bg-slate-50/70">
                                 <td class="table-cell">
                                     <span class="font-medium text-slate-900">{{ $plan->name }}</span>
+                                    @if (! $plan->is_public)
+                                        <x-badge color="violet" class="ml-1">Backend only</x-badge>
+                                    @endif
+                                    @if ($plan->is_free)
+                                        <x-badge color="green" class="ml-1">Free</x-badge>
+                                    @endif
                                     @if ($plan->description)
                                         <span class="block text-xs text-slate-400">{{ $plan->description }}</span>
                                     @endif
+                                    <span class="mt-1 block text-xs text-slate-400">
+                                        @foreach (\App\Models\Plan::LIMITS as $key => $label)
+                                            {{ $label }}: {{ $plan->limitLabel($key) }}@if (! $loop->last) · @endif
+                                        @endforeach
+                                    </span>
                                 </td>
                                 <td class="table-cell">
                                     <x-badge :color="$plan->billing_period === \App\Enums\BillingPeriod::Lifetime ? 'violet' : 'blue'">
@@ -44,6 +55,9 @@
                                     {{ $plan->currency_code }} {{ number_format((float) $plan->monthly_price, 2) }}
                                     <span class="block text-xs font-normal text-slate-400">
                                         {{ $plan->billing_period->suffix() }}
+                                        @if ($plan->offersYearly() && $plan->yearlyDiscount() > 0)
+                                            · yearly −{{ rtrim(rtrim(number_format($plan->yearlyDiscount(), 2), '0'), '.') }}%
+                                        @endif
                                         @if ($plan->prices->isNotEmpty())
                                             · {{ $plan->prices->pluck('currency_code')->implode(', ') }}
                                         @endif

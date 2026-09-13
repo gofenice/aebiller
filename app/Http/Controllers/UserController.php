@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
+use App\Services\PlanLimits;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -39,8 +40,12 @@ class UserController extends Controller
         ]);
     }
 
-    public function store(StoreUserRequest $request): RedirectResponse
+    public function store(StoreUserRequest $request, PlanLimits $limits): RedirectResponse
     {
+        if ($blocked = $limits->reasonToBlock('max_users')) {
+            return back()->withInput()->with('error', $blocked);
+        }
+
         $user = User::create($request->validated());
 
         return redirect()->route('users.index')->with('status', "{$user->name} can now sign in as {$user->role->label()}.");

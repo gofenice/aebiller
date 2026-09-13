@@ -71,15 +71,22 @@ class RazorpayGateway
     /**
      * Razorpay keeps its own copy of a plan. Created once, then remembered.
      *
-     * A plan sold in several currencies needs one of these per currency —
-     * Razorpay fixes the amount and the currency on the plan itself, so a shop
-     * billed in riyals must not be put on the dollar one.
+     * Razorpay fixes the amount, the currency and the interval on that copy, so
+     * a plan sold in several currencies on two periods needs one per
+     * combination: a shop paying yearly in riyals must not be put on the
+     * monthly dollar one.
      */
-    public function remotePlanFor(Plan $plan, ?string $currency = null): string
+    public function remotePlanFor(Plan $plan, ?string $currency = null, ?BillingPeriod $period = null): string
     {
         $this->ensureEnabled();
 
-        $price = $plan->amountIn($currency);
+        $period ??= $plan->billing_period;
+        // Whether the charge itself is yearly — not whether a monthly plan
+        // could be upgraded to yearly. A plan already priced by the year is
+        // charged yearly too, and amountIn() decides about the discount.
+        $yearly = $period === BillingPeriod::Yearly;
+        $price = $plan->amountIn($currency, $period);
+        $column = $yearly ? 'razorpay_yearly_plan_id' : 'razorpay_plan_id';
 
         // The base price is remembered on the plan; every other currency on the
         // row that carries its price.
@@ -87,15 +94,16 @@ class RazorpayGateway
             ? $plan
             : $plan->prices()->where('currency_code', $price['currency'])->firstOrFail();
 
-        if (filled($holder->razorpay_plan_id)) {
-            return $holder->razorpay_plan_id;
+        if (filled($holder->{$column})) {
+            return $holder->{$column};
         }
 
         $response = $this->request()->post($this->url('/plans'), [
-            'period' => $plan->billing_period === BillingPeriod::Yearly ? 'yearly' : 'monthly',
+            'period' => $yearly ? 'yearly' : 'monthly',
             'interval' => 1,
             'item' => [
-                'name' => config('tenancy.platform_name').' — '.$plan->name.' ('.$price['currency'].')',
+                'name' => config('tenancy.platform_name').' — '.$plan->name
+                    .' ('.$price['currency'].', '.($yearly ? 'yearly' : 'monthly').')',
                 'amount' => $this->subunits($price['amount']),
                 'currency' => $price['currency'],
             ],
@@ -105,13 +113,14 @@ class RazorpayGateway
             Log::error('Razorpay plan failed', [
                 'plan' => $plan->slug,
                 'currency' => $price['currency'],
+                'period' => $yearly ? 'yearly' : 'monthly',
                 'body' => $response->body(),
             ]);
 
             throw new RuntimeException('Razorpay could not set that plan up. Please try again shortly.');
         }
 
-        $holder->update(['razorpay_plan_id' => $response->json('id')]);
+        $holder->update([$column => $response->json('id')]);
 
         return $response->json('id');
     }
@@ -133,7 +142,7 @@ class RazorpayGateway
         }
 
         $response = $this->request()->post($this->url('/subscriptions'), [
-            'plan_id' => $this->remotePlanFor($plan, $store->billedCurrency()),
+            'plan_id' => $this->remotePlanFor($plan, $store->billedCurrency(), $store->billingPeriod()),
             // Razorpay wants a finite number of cycles; ten years of them.
             'total_count' => $store->billingPeriod() === BillingPeriod::Yearly ? 10 : 120,
             'customer_notify' => 1,

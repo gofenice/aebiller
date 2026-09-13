@@ -1,7 +1,7 @@
 <x-layouts.marketing>
     @php
         $registerUrl = route('register');
-        $highlight = $monthlyPlans->skip(1)->first() ?? $monthlyPlans->first();
+        $highlight = $plans->skip(1)->first() ?? $plans->first();
     @endphp
 
     {{-- Hero --}}
@@ -180,24 +180,49 @@
     </section>
 
     {{-- Pricing --}}
-    <section id="pricing" class="mx-auto max-w-6xl scroll-mt-24 px-4 py-20 sm:px-6 lg:py-28">
+    <section id="pricing" x-data="{ yearly: false }" class="mx-auto max-w-6xl scroll-mt-24 px-4 py-20 sm:px-6 lg:py-28">
         <div class="max-w-2xl">
             <span class="ae-rule"></span>
             <h2 class="mt-6 text-3xl font-semibold tracking-tight sm:text-4xl">One price, the whole shop</h2>
             <p class="mt-4 text-lg text-ink-600">
-                Every plan includes the till, stock, loyalty, reports and unlimited staff accounts. Start with {{ $trialDays }} days
+                Every plan includes the till, stock, loyalty and reports. Start with {{ $trialDays }} days
                 free — nothing to pay until the trial ends.
             </p>
         </div>
 
-        @if ($monthlyPlans->isEmpty() && $otherPlans->isEmpty())
+        @if ($plans->isEmpty())
             <p class="mt-10 rounded-xl border border-dashed border-ink-300 px-6 py-10 text-center text-ink-500">
                 Prices are being updated. Please check back shortly.
             </p>
         @else
-            <div class="mt-12 grid gap-6 lg:grid-cols-3">
-                @foreach ($monthlyPlans as $plan)
-                    @php $featured = $highlight !== null && $plan->is($highlight); @endphp
+            {{-- Monthly / yearly. Both prices are rendered and one is hidden, so
+                 the figures are the server's rather than worked out in the browser. --}}
+            <div class="mt-10 flex flex-wrap items-center gap-3">
+                <div class="inline-flex rounded-lg border border-ink-200 bg-ink-50 p-1">
+                    <button type="button" x-on:click="yearly = false"
+                        x-bind:class="yearly ? 'text-ink-500 hover:text-ink-900' : 'bg-white text-ink-900 shadow-sm'"
+                        class="rounded-md px-5 py-2 text-sm font-semibold transition">Monthly</button>
+                    <button type="button" x-on:click="yearly = true"
+                        x-bind:class="yearly ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-900'"
+                        class="rounded-md px-5 py-2 text-sm font-semibold transition">Yearly</button>
+                </div>
+                @if ($topDiscount > 0)
+                    <span class="rounded-full bg-ae-600/10 px-3 py-1 text-xs font-semibold text-ae-700">
+                        Save up to {{ $topDiscount }}% paying yearly
+                    </span>
+                @endif
+            </div>
+
+            <div class="mt-8 grid gap-6 lg:grid-cols-3">
+                @foreach ($plans as $plan)
+                    @php
+                        $featured = $highlight !== null && $plan->is($highlight);
+                        $monthly = $plan->amountIn($currency, \App\Enums\BillingPeriod::Monthly);
+                        $yearlyPrice = $plan->amountIn($currency, \App\Enums\BillingPeriod::Yearly);
+                        $symbol = trim(\App\Support\DisplayCurrency::symbolOf($monthly['currency']));
+                        $monthlyUrl = route('register', ['plan' => $plan->slug, 'period' => 'monthly']);
+                        $yearlyUrl = route('register', ['plan' => $plan->slug, 'period' => 'yearly']);
+                    @endphp
                     <div @class([
                         'relative flex flex-col rounded-2xl border p-7',
                         'border-ink-900 bg-ink-950 text-white shadow-xl' => $featured,
@@ -214,16 +239,35 @@
                             {{ $plan->description }}
                         </p>
 
-                        @php $price = $plan->amountIn($currency); @endphp
                         <p class="mt-6 flex items-baseline gap-1.5">
-                            <span class="text-sm font-medium">{{ trim(\App\Support\DisplayCurrency::symbolOf($price['currency'])) }}</span>
-                            <span class="text-4xl font-semibold tracking-tight">{{ number_format($price['amount'], 0) }}</span>
+                            <span class="text-sm font-medium">{{ $symbol }}</span>
+                            <span class="text-4xl font-semibold tracking-tight" x-show="! yearly">{{ number_format($monthly['amount'], 0) }}</span>
+                            <span class="text-4xl font-semibold tracking-tight" x-show="yearly" x-cloak>{{ number_format($yearlyPrice['amount'], 0) }}</span>
                             <span @class(['text-sm', 'text-ink-400' => $featured, 'text-ink-500' => ! $featured])>
-                                {{ $plan->billing_period->suffix() }}
+                                <span x-show="! yearly">/ month</span>
+                                <span x-show="yearly" x-cloak>/ year</span>
                             </span>
                         </p>
 
-                        <a href="{{ route('register', ['plan' => $plan->slug]) }}"
+                        @if ($plan->offersYearly() && $plan->yearlyDiscount() > 0)
+                            <p class="mt-1 text-xs font-medium text-ae-600" x-show="yearly" x-cloak>
+                                {{ $symbol }}{{ number_format($plan->yearlySavingIn($currency), 0) }} less than paying monthly
+                            </p>
+                        @endif
+
+                        <ul @class(['mt-6 space-y-2 border-t pt-5 text-sm', 'border-white/10' => $featured, 'border-ink-100' => ! $featured])>
+                            @foreach (\App\Models\Plan::LIMITS as $key => $label)
+                                <li class="flex items-baseline justify-between gap-3">
+                                    <span @class(['text-ink-300' => $featured, 'text-ink-500' => ! $featured])>{{ $label }}</span>
+                                    <span class="font-semibold">{{ $plan->limitLabel($key) }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+
+                        {{-- href is the monthly link so the card still works with
+                             no JavaScript; Alpine swaps it when the toggle moves. --}}
+                        <a href="{{ $monthlyUrl }}"
+                            x-bind:href="yearly ? {{ Js::from($yearlyUrl) }} : {{ Js::from($monthlyUrl) }}"
                             @class([
                                 'mt-7 rounded-lg px-4 py-3 text-center text-sm font-semibold transition',
                                 'bg-ae-600 text-white hover:bg-ae-500' => $featured,
@@ -234,35 +278,6 @@
                     </div>
                 @endforeach
             </div>
-
-            @if ($otherPlans->isNotEmpty())
-                <div class="mt-6 grid gap-6 sm:grid-cols-2">
-                    @foreach ($otherPlans as $plan)
-                        <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-ink-200 bg-ink-50 px-7 py-6">
-                            <div>
-                                <h3 class="font-semibold">
-                                    {{ $plan->name }}
-                                    <span class="ml-1 rounded bg-ae-600/10 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-ae-700 uppercase">
-                                        {{ $plan->billing_period->label() }}
-                                    </span>
-                                </h3>
-                                <p class="mt-1 text-sm text-ink-500">{{ $plan->description }}</p>
-                            </div>
-                            <div class="flex items-center gap-5">
-                                @php $price = $plan->amountIn($currency); @endphp
-                                <p class="text-right">
-                                    <span class="text-2xl font-semibold tracking-tight">{{ \App\Support\DisplayCurrency::format($price['amount'], $price['currency']) }}</span>
-                                    <span class="block text-xs text-ink-500">{{ $plan->billing_period->suffix() }}</span>
-                                </p>
-                                <a href="{{ route('register', ['plan' => $plan->slug]) }}"
-                                    class="rounded-lg border border-ink-900 px-4 py-2.5 text-sm font-semibold transition hover:bg-ink-900 hover:text-white">
-                                    Subscribe
-                                </a>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
         @endif
 
         <p class="mt-8 text-sm text-ink-500">
@@ -281,7 +296,9 @@
                 @foreach ([
                     ['What happens after the '.$trialDays.' days?', 'Your first invoice falls due the day the trial ends, charged only for the days left in that month. Pay it and nothing changes; leave it and the shop pauses until you do — your data is kept either way.'],
                     ['Do I need a card to start?', 'No. Sign up, use it for '.$trialDays.' days, and decide after that. We only ask for payment when the trial ends.'],
-                    ['Can my staff use it at the same time?', 'Yes. Staff accounts are unlimited, and you decide who is an owner and who is a cashier. Only owners can delete records or see the money screens.'],
+                    ['Can I pay yearly instead?', 'Yes, and it costs less. Use the monthly/yearly switch above the plans — you can start monthly and move to yearly later.'],
+                    ['What if I outgrow my plan?', 'Move up whenever you like. You are told which limit you have reached and what the next plan allows, and the change takes effect straight away.'],
+                    ['Can my staff use it at the same time?', 'Yes. You decide who is an owner and who is a cashier, and only owners can delete records or see the money screens.'],
                     ['Does it work on the till computer I already have?', 'It runs in a browser, so anything from a phone to an old counter PC will do. A USB barcode scanner works as a keyboard — no driver, no setup.'],
                     ['Is my shop separate from other shops?', 'Completely. Your shop has its own address and its own data; nothing is shared or visible to anyone else.'],
                 ] as [$question, $answer])

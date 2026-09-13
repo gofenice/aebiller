@@ -55,15 +55,33 @@ class MarketingSiteTest extends TestCase
             ->assertDontSee('Retired Plan');
     }
 
-    public function test_lifetime_and_yearly_plans_are_shown_apart_from_the_monthly_ones(): void
+    public function test_a_plan_can_be_paid_monthly_or_yearly_from_the_same_card(): void
     {
-        Plan::factory()->create(['name' => 'Monthly Plan', 'billing_period' => BillingPeriod::Monthly]);
-        Plan::factory()->create(['name' => 'Forever Plan', 'billing_period' => BillingPeriod::Lifetime, 'monthly_price' => 4999]);
+        Plan::factory()->create([
+            'name' => 'Gold',
+            'monthly_price' => 100,
+            'yearly_discount_percent' => 20,
+            'billing_period' => BillingPeriod::Monthly,
+        ]);
+
+        // Both figures are rendered and the toggle hides one, so the price is
+        // always the server's rather than worked out in the browser.
+        $this->get($this->central())
+            ->assertOk()
+            ->assertSee('Gold')
+            ->assertSee('100')
+            // 100 x 12 = 1200, less 20% = 960
+            ->assertSee('960');
+    }
+
+    public function test_a_backend_only_plan_is_kept_off_the_public_site(): void
+    {
+        Plan::factory()->create(['name' => 'Chosen Plan']);
+        Plan::factory()->lifetimeFree()->create(['name' => 'Lifetime Free']);
 
         $this->get($this->central())
-            ->assertSee('Forever Plan')
-            ->assertSee('Lifetime')
-            ->assertSee('4,999');
+            ->assertSee('Chosen Plan')
+            ->assertDontSee('Lifetime Free');
     }
 
     public function test_the_platform_admin_lives_on_its_own_subdomain(): void

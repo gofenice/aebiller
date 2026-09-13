@@ -199,6 +199,31 @@ class PricingCurrencyTest extends TestCase
         $this->assertSame('plan_USD1', $plan->fresh()->razorpay_plan_id);
     }
 
+    public function test_a_monthly_plan_bought_yearly_is_charged_yearly_at_the_discounted_price(): void
+    {
+        $this->enableRazorpay();
+        $plan = $this->planPricedAt(39, ['SAR' => 145]);
+        $plan->update(['yearly_discount_percent' => 20]);
+
+        Http::fake(['api.razorpay.com/*' => Http::response(['id' => 'plan_SAR_YEAR'])]);
+
+        $id = app(RazorpayGateway::class)->remotePlanFor($plan->fresh(), 'SAR', BillingPeriod::Yearly);
+
+        $this->assertSame('plan_SAR_YEAR', $id);
+
+        // 145 x 12 = 1740, less 20% = 1392.00 -> 139200 in the smallest unit,
+        // on a yearly cycle. Charging the monthly figure here would bill the
+        // shop a twelfth of what it agreed to.
+        Http::assertSent(fn ($request): bool => $request['period'] === 'yearly'
+            && $request['item']['amount'] === 139200
+            && $request['item']['currency'] === 'SAR');
+
+        // Kept apart from the monthly id, or one would overwrite the other.
+        $price = $plan->prices()->where('currency_code', 'SAR')->first();
+        $this->assertSame('plan_SAR_YEAR', $price->razorpay_yearly_plan_id);
+        $this->assertNull($price->razorpay_plan_id);
+    }
+
     public function test_a_razorpay_plan_is_made_once_per_currency_and_then_reused(): void
     {
         $this->enableRazorpay();

@@ -13,6 +13,7 @@ use App\Models\Supplier;
 use App\Models\Unit;
 use App\Services\BarcodeGenerator;
 use App\Services\InventoryService;
+use App\Services\PlanLimits;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -103,8 +104,12 @@ class ProductController extends Controller
     /**
      * Save a new product and its opening stock.
      */
-    public function store(StoreProductRequest $request): RedirectResponse
+    public function store(StoreProductRequest $request, PlanLimits $limits): RedirectResponse
     {
+        if ($blocked = $limits->reasonToBlock('max_products')) {
+            return back()->withInput()->with('error', $blocked);
+        }
+
         $data = $this->productAttributes($request);
         $data['created_by'] = $request->user()->id;
         $data['updated_by'] = $request->user()->id;

@@ -152,25 +152,49 @@
                 </fieldset>
 
                 @if ($plans->isNotEmpty())
-                    <fieldset>
+                    <fieldset x-data="{ yearly: {{ old('period', $chosenPeriod) === 'yearly' ? 'true' : 'false' }} }">
                         <legend class="mb-4 text-xs font-semibold tracking-[0.2em] text-ink-500 uppercase">Plan after the trial</legend>
+
+                        <input type="hidden" name="period" x-bind:value="yearly ? 'yearly' : 'monthly'"
+                            value="{{ old('period', $chosenPeriod) }}">
+
+                        <div class="mb-4 inline-flex rounded-lg border border-ink-200 bg-ink-50 p-1">
+                            <button type="button" x-on:click="yearly = false"
+                                x-bind:class="yearly ? 'text-ink-500' : 'bg-white text-ink-900 shadow-sm'"
+                                class="rounded-md px-4 py-1.5 text-sm font-semibold transition">Monthly</button>
+                            <button type="button" x-on:click="yearly = true"
+                                x-bind:class="yearly ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'"
+                                class="rounded-md px-4 py-1.5 text-sm font-semibold transition">Yearly</button>
+                        </div>
+
                         <div class="grid gap-3 sm:grid-cols-2">
                             @foreach ($plans as $plan)
-                                @php $price = $plan->amountIn($currency); @endphp
+                                @php
+                                    $monthly = $plan->amountIn($currency, \App\Enums\BillingPeriod::Monthly);
+                                    $yearlyPrice = $plan->amountIn($currency, \App\Enums\BillingPeriod::Yearly);
+                                @endphp
                                 <label class="cursor-pointer">
                                     <input type="radio" name="plan" value="{{ $plan->slug }}" class="peer sr-only"
                                         @checked(old('plan', $chosenPlan ?: $plans->first()->slug) === $plan->slug)>
                                     <span class="block rounded-xl border border-ink-200 px-4 py-3 transition peer-checked:border-ae-600 peer-checked:bg-ae-50 hover:border-ink-300">
                                         <span class="flex items-center justify-between gap-3">
                                             <span class="font-semibold">{{ $plan->name }}</span>
-                                            <span class="text-sm font-semibold">{{ \App\Support\DisplayCurrency::format($price['amount'], $price['currency']) }}</span>
+                                            <span class="text-sm font-semibold">
+                                                <span x-show="! yearly">{{ \App\Support\DisplayCurrency::format($monthly['amount'], $monthly['currency']) }}</span>
+                                                <span x-show="yearly" x-cloak>{{ \App\Support\DisplayCurrency::format($yearlyPrice['amount'], $yearlyPrice['currency']) }}</span>
+                                            </span>
                                         </span>
-                                        <span class="mt-0.5 block text-xs text-ink-500">{{ $plan->billing_period->label() }} · nothing to pay for {{ $trialDays }} days</span>
+                                        <span class="mt-0.5 block text-xs text-ink-500">
+                                            <span x-show="! yearly">Billed monthly</span>
+                                            <span x-show="yearly" x-cloak>Billed yearly</span>
+                                            · nothing to pay for {{ $trialDays }} days
+                                        </span>
                                     </span>
                                 </label>
                             @endforeach
                         </div>
                         @error('plan') <p class="mt-1 text-xs font-medium text-ae-700">{{ $message }}</p> @enderror
+                        @error('period') <p class="mt-1 text-xs font-medium text-ae-700">{{ $message }}</p> @enderror
                     </fieldset>
                 @endif
 

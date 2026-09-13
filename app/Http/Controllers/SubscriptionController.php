@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\InvoiceStatus;
 use App\Models\StoreInvoice;
 use App\Services\BillingCycle;
+use App\Services\PlanLimits;
 use App\Services\RazorpayGateway;
 use App\Support\StoreContext;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +24,7 @@ class SubscriptionController extends Controller
         protected RazorpayGateway $razorpay,
     ) {}
 
-    public function show(): View
+    public function show(PlanLimits $limits): View
     {
         $store = StoreContext::get();
 
@@ -34,6 +35,9 @@ class SubscriptionController extends Controller
             'locked' => $store->isLocked(),
             'canPay' => $this->razorpay->enabled(),
             'canAutoCharge' => $this->razorpay->enabled() && $store->billingPeriod()->isRecurring() && $store->plan !== null,
+            // Only worth showing where something is actually capped: a panel of
+            // four "Unlimited" rows tells the shop nothing.
+            'usage' => collect($limits->summary())->reject(fn (array $row): bool => $row['unlimited'])->all(),
         ]);
     }
 

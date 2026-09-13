@@ -127,7 +127,7 @@
                         <option value="">No plan (free)</option>
                         @foreach ($plans as $plan)
                             <option value="{{ $plan->id }}" @selected((int) old('plan_id', $store->plan_id) === $plan->id)>
-                                {{ $plan->name }} — {{ $plan->priceLabel() }}
+                                {{ $plan->name }} — {{ $plan->is_free ? 'free, never invoiced' : $plan->priceLabel() }}
                             </option>
                         @endforeach
                     </x-select>

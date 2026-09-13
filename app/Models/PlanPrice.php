@@ -18,6 +18,7 @@ class PlanPrice extends Model
         'currency_code',
         'amount',
         'razorpay_plan_id',
+        'razorpay_yearly_plan_id',
     ];
 
     /**

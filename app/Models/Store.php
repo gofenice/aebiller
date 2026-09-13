@@ -133,9 +133,12 @@ class Store extends Model
             return (float) $this->monthly_fee;
         }
 
-        // The plan's price in the currency this store is billed in — set by
-        // hand per currency, so it is a real price rather than a conversion.
-        return $this->plan !== null ? $this->plan->amountIn($this->billingCurrency())['amount'] : 0.0;
+        // The plan's price in the currency this store is billed in and for the
+        // period it pays on — set by hand per currency, so it is a real price
+        // rather than a conversion.
+        return $this->plan !== null
+            ? $this->plan->amountIn($this->billingCurrency(), $this->billingPeriod())['amount']
+            : 0.0;
     }
 
     /**
@@ -227,7 +230,7 @@ class Store extends Model
             return $this->billingCurrency();
         }
 
-        return $this->plan->amountIn($this->billingCurrency())['currency'];
+        return $this->plan->amountIn($this->billingCurrency(), $this->billingPeriod())['currency'];
     }
 
     /**

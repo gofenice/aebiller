@@ -35,6 +35,18 @@ class SavePlanRequest extends FormRequest
             'monthly_price' => ['required', 'numeric', 'min:0', 'max:9999999'],
             'billing_period' => ['required', Rule::enum(BillingPeriod::class)],
 
+            // What a year costs against twelve months of the monthly price.
+            'yearly_discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+
+            // Blank means no limit at all on this plan.
+            'max_products' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            'max_monthly_bills' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            'max_users' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            'max_customers' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+
+            'is_public' => ['nullable', 'boolean'],
+            'is_free' => ['nullable', 'boolean'],
+
             // One optional price per offered currency; blank means "use the base price".
             'prices' => ['nullable', 'array'],
             'prices.*' => ['nullable', 'numeric', 'min:0', 'max:99999999'],

@@ -11,6 +11,7 @@ use App\Models\Sale;
 use App\Services\BillingService;
 use App\Services\InventoryService;
 use App\Services\LoyaltyService;
+use App\Services\PlanLimits;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,8 +52,12 @@ class BillingController extends Controller
     /**
      * Take payment: write the bill and take the goods out of stock.
      */
-    public function store(StoreSaleRequest $request): RedirectResponse
+    public function store(StoreSaleRequest $request, PlanLimits $limits): RedirectResponse
     {
+        if ($blocked = $limits->reasonToBlock('max_monthly_bills')) {
+            return back()->withInput()->with('error', $blocked);
+        }
+
         try {
             $sale = $this->billing->createSale(
                 attributes: $request->safe()->except('items'),

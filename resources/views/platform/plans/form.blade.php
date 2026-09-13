@@ -45,6 +45,12 @@
                     </x-select>
                 </x-field>
 
+                <x-field class="sm:col-span-3" label="Yearly discount %" name="yearly_discount_percent"
+                    hint="A year costs twelve months less this. 20% is two months free.">
+                    <x-input type="number" step="0.01" min="0" max="100" name="yearly_discount_percent" id="yearly_discount_percent"
+                        value="{{ old('yearly_discount_percent', $plan->yearly_discount_percent ?? 20) }}" class="text-right" />
+                </x-field>
+
                 <div class="sm:col-span-6">
                     <p class="form-label">Price in other currencies</p>
                     <p class="form-hint mb-3">
@@ -64,6 +70,22 @@
                     </div>
                 </div>
 
+                <div class="sm:col-span-6">
+                    <p class="form-label">What this plan allows</p>
+                    <p class="form-hint mb-3">
+                        Leave one blank for no limit. A shop that reaches a limit is told which plan lifts it,
+                        and can carry on billing as usual.
+                    </p>
+                    <div class="grid gap-3 sm:grid-cols-4">
+                        @foreach (\App\Models\Plan::LIMITS as $key => $label)
+                            <x-field :label="$label" :name="$key">
+                                <x-input type="number" min="0" :name="$key" :id="$key"
+                                    value="{{ old($key, $plan->$key) }}" class="text-right" placeholder="Unlimited" />
+                            </x-field>
+                        @endforeach
+                    </div>
+                </div>
+
                 <x-field class="sm:col-span-6" label="What it includes" name="description">
                     <x-input name="description" id="description" value="{{ old('description', $plan->description) }}" />
                 </x-field>
@@ -72,8 +94,12 @@
                     <x-input type="number" min="0" name="sort_order" id="sort_order" value="{{ old('sort_order', $plan->sort_order ?? 0) }}" />
                 </x-field>
 
-                <div class="sm:col-span-4 sm:pt-7">
+                <div class="sm:col-span-4 space-y-2 sm:pt-7">
                     <x-checkbox name="is_active" label="Offered to new stores" :checked="old('is_active', $plan->is_active ?? true)" />
+                    <x-checkbox name="is_public" label="Show on the public pricing table"
+                        :checked="old('is_public', $plan->is_public ?? true)" />
+                    <x-checkbox name="is_free" label="Free — never invoiced"
+                        :checked="old('is_free', $plan->is_free ?? false)" />
                 </div>
             </div>
         </x-form-section>

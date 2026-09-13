@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Marketing;
 
-use App\Enums\BillingPeriod;
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use App\Support\DisplayCurrency;
@@ -16,13 +15,16 @@ class LandingController extends Controller
      */
     public function __invoke(): View
     {
-        $plans = Plan::query()->active()->ordered()->with('prices')->get();
+        // public(): the free lifetime plan is handed out from the platform and
+        // has no business on the pricing table.
+        $plans = Plan::query()->active()->public()->ordered()->with('prices')->get();
 
         return view('marketing.landing', [
-            'monthlyPlans' => $plans->where('billing_period', BillingPeriod::Monthly),
-            'otherPlans' => $plans->whereIn('billing_period', [BillingPeriod::Yearly, BillingPeriod::Lifetime]),
+            'plans' => $plans,
             'trialDays' => config('tenancy.trial_days'),
             'currency' => DisplayCurrency::current(),
+            // What the toggle can promise: the best saving on offer.
+            'topDiscount' => (int) round($plans->max(fn (Plan $plan): float => $plan->offersYearly() ? $plan->yearlyDiscount() : 0) ?? 0),
         ]);
     }
 }

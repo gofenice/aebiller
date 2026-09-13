@@ -37,7 +37,15 @@ class RegisterStoreRequest extends FormRequest
             'owner_email' => ['required', 'email', 'max:150'],
             'owner_phone' => ['nullable', 'string', 'max:20'],
             'password' => ['required', 'confirmed', Password::defaults()],
-            'plan' => ['nullable', 'exists:plans,slug'],
+            // Only a plan a shop may pick for itself: the free lifetime plan is
+            // given out from the platform, never chosen off the sign-up form.
+            'plan' => [
+                'nullable',
+                Rule::exists('plans', 'slug')->where(function ($query): void {
+                    $query->where('is_active', true)->where('is_public', true);
+                }),
+            ],
+            'period' => ['nullable', Rule::in(['monthly', 'yearly'])],
             'currency_code' => ['required', Rule::in(array_keys(config('tenancy.currencies')))],
             'timezone' => ['required', Rule::in(config('tenancy.timezones'))],
             'terms' => ['accepted'],

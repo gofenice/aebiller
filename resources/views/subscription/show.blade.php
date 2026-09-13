@@ -133,6 +133,38 @@
         @endif
     @endcan
 
+    @if (! empty($usage))
+        <div class="card mt-5 px-5 py-4">
+            <p class="text-sm font-semibold text-slate-900">What your plan covers</p>
+            <p class="mt-1 text-xs text-slate-500">
+                Reaching one of these stops you adding more of it — everything else keeps working.
+            </p>
+
+            <dl class="mt-3 space-y-2.5">
+                @foreach ($usage as $row)
+                    @php
+                        $limit = max(1, (int) $row['limit']);
+                        $used = (int) $row['used'];
+                        $portion = min(100, (int) round($used / $limit * 100));
+                        $full = $used >= (int) $row['limit'];
+                    @endphp
+                    <div>
+                        <div class="flex items-baseline justify-between gap-3 text-xs">
+                            <dt class="text-slate-600">{{ $row['label'] }}</dt>
+                            <dd @class(['font-medium', 'text-red-600' => $full, 'text-slate-700' => ! $full])>
+                                {{ number_format($used) }} of {{ number_format((int) $row['limit']) }}
+                            </dd>
+                        </div>
+                        <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                            <div @class(['h-full rounded-full', 'bg-red-500' => $full, 'bg-brand-600' => ! $full])
+                                style="width: {{ $portion }}%"></div>
+                        </div>
+                    </div>
+                @endforeach
+            </dl>
+        </div>
+    @endif
+
     <dl class="mt-5 space-y-1 text-xs text-slate-500">
         <div class="flex justify-between"><dt>Plan</dt><dd>{{ $store->plan?->name ?? 'No plan' }} · {{ $store->feeLabel() }}</dd></div>
         <div class="flex justify-between"><dt>Billing</dt><dd>{{ $store->billingPeriod()->label() }}</dd></div>
