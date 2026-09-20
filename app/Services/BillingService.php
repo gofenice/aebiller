@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\MovementType;
 use App\Enums\PaymentMethod;
 use App\Enums\SaleStatus;
+use App\Models\CreditPayment;
 use App\Models\Customer;
 use App\Models\LoyaltyRedemptionOtp;
 use App\Models\Product;
@@ -77,9 +78,17 @@ class BillingService
                 : PaymentMethod::from($attributes['payment_method']);
 
             $grandTotal = $priced['totals']['grand_total'];
-            $amountPaid = $paymentMethod->needsTendering()
-                ? (float) ($attributes['amount_paid'] ?? $grandTotal)
-                : $grandTotal;
+
+            if ($paymentMethod->isCredit() && $customer === null) {
+                // Without a member there is nobody to chase for the money.
+                throw new RuntimeException('Credit needs a loyalty member on the bill — attach the customer first.');
+            }
+
+            $amountPaid = match (true) {
+                $paymentMethod->isCredit() => min((float) ($attributes['amount_paid'] ?? 0), $grandTotal),
+                $paymentMethod->needsTendering() => (float) ($attributes['amount_paid'] ?? $grandTotal),
+                default => $grandTotal,
+            };
 
             if ($paymentMethod->needsTendering() && $amountPaid + 0.001 < $grandTotal) {
                 throw new RuntimeException(sprintf(
@@ -88,6 +97,8 @@ class BillingService
                     number_format($grandTotal, 2),
                 ));
             }
+
+            $outstanding = $paymentMethod->isCredit() ? round(max($grandTotal - $amountPaid, 0), 2) : 0.0;
 
             $sale = Sale::create([
                 'invoice_no' => $this->inventory->nextReference(Sale::class, 'INV', 'invoice_no'),
@@ -99,7 +110,9 @@ class BillingService
                 ...$priced['totals'],
                 'payment_method' => $paymentMethod,
                 'amount_paid' => round($amountPaid, 2),
-                'change_due' => round(max($amountPaid - $grandTotal, 0), 2),
+                'change_due' => $paymentMethod->isCredit() ? 0 : round(max($amountPaid - $grandTotal, 0), 2),
+                'amount_outstanding' => $outstanding,
+                'settled_at' => $paymentMethod->isCredit() && $outstanding <= 0 ? now() : null,
                 'notes' => $attributes['notes'] ?? null,
                 'cashier_id' => $cashier->id,
                 'sold_at' => $attributes['sold_at'] ?? now(),
@@ -212,9 +225,78 @@ class BillingService
                 'voided_by' => $user->id,
                 'voided_at' => now(),
                 'void_reason' => $reason,
+                // A cancelled bill is not a debt, whatever was owed on it.
+                'amount_outstanding' => 0,
             ]);
 
             $this->loyalty->reverseSale($sale, $user);
+        });
+    }
+
+    /**
+     * Take money against a credit bill, in full or in part.
+     *
+     * @param  array{amount: float|string, payment_method?: PaymentMethod|string, reference?: ?string, notes?: ?string, received_at?: mixed}  $attributes
+     */
+    public function settleCredit(Sale $sale, array $attributes, User $user): CreditPayment
+    {
+        return DB::transaction(function () use ($sale, $attributes, $user): CreditPayment {
+            // Locked, so two cashiers taking the same payment cannot both
+            // knock it off the balance.
+            $sale = Sale::lockForUpdate()->findOrFail($sale->id);
+
+            if ($sale->isVoided()) {
+                throw new RuntimeException("Bill {$sale->invoice_no} was voided — there is nothing to collect.");
+            }
+
+            if ($sale->isSettled()) {
+                throw new RuntimeException("Bill {$sale->invoice_no} is already paid in full.");
+            }
+
+            $amount = round((float) $attributes['amount'], 2);
+
+            if ($amount <= 0) {
+                throw new RuntimeException('Enter how much the customer is paying.');
+            }
+
+            $outstanding = (float) $sale->amount_outstanding;
+
+            if ($amount - 0.001 > $outstanding) {
+                throw new RuntimeException(sprintf(
+                    'That is more than the %s still owed on this bill.',
+                    number_format($outstanding, 2),
+                ));
+            }
+
+            $method = $attributes['payment_method'] ?? PaymentMethod::Cash;
+
+            if (! $method instanceof PaymentMethod) {
+                $method = PaymentMethod::from($method);
+            }
+
+            if ($method->isCredit()) {
+                throw new RuntimeException('Credit cannot pay off credit — record how the money arrived.');
+            }
+
+            $payment = $sale->creditPayments()->create([
+                'customer_id' => $sale->customer_id,
+                'amount' => $amount,
+                'payment_method' => $method,
+                'reference' => $attributes['reference'] ?? null,
+                'notes' => $attributes['notes'] ?? null,
+                'received_by' => $user->id,
+                'received_at' => $attributes['received_at'] ?? now(),
+            ]);
+
+            $remaining = round($outstanding - $amount, 2);
+
+            $sale->update([
+                'amount_paid' => round((float) $sale->amount_paid + $amount, 2),
+                'amount_outstanding' => $remaining,
+                'settled_at' => $remaining <= 0 ? now() : null,
+            ]);
+
+            return $payment;
         });
     }
 

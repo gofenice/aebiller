@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
     'uuid', 'invoice_no', 'status', 'customer_id', 'customer_name', 'customer_phone', 'customer_vat_number',
     'items_gross', 'line_discount_total', 'bill_discount', 'loyalty_discount', 'subtotal_excl_vat', 'vat_total',
     'grand_total', 'cost_total', 'payment_method', 'amount_paid', 'change_due', 'notes',
+    'amount_outstanding', 'settled_at',
     'loyalty_points_earned', 'loyalty_points_redeemed', 'loyalty_balance_after',
     'cashier_id', 'sold_at', 'voided_by', 'voided_at', 'void_reason',
 ])]
@@ -68,6 +69,8 @@ class Sale extends Model
             'cost_total' => 'decimal:2',
             'amount_paid' => 'decimal:2',
             'change_due' => 'decimal:2',
+            'amount_outstanding' => 'decimal:2',
+            'settled_at' => 'datetime',
         ];
     }
 
@@ -113,9 +116,58 @@ class Sale extends Model
         return $this->morphMany(StockMovement::class, 'source');
     }
 
+    /**
+     * Money taken against this bill after it was rung up.
+     *
+     * @return HasMany<CreditPayment, $this>
+     */
+    public function creditPayments(): HasMany
+    {
+        return $this->hasMany(CreditPayment::class);
+    }
+
     public function isVoided(): bool
     {
         return $this->status === SaleStatus::Voided;
+    }
+
+    public function isCredit(): bool
+    {
+        return $this->payment_method === PaymentMethod::Credit;
+    }
+
+    /**
+     * Nothing left to collect on this bill.
+     */
+    public function isSettled(): bool
+    {
+        return (float) $this->amount_outstanding <= 0;
+    }
+
+    /**
+     * How long the money has been owed, in whole days.
+     */
+    public function daysOutstanding(): int
+    {
+        return (int) $this->sold_at->startOfDay()->diffInDays(now()->startOfDay());
+    }
+
+    /**
+     * @param  Builder<Sale>  $query
+     */
+    public function scopeCompleted(Builder $query): void
+    {
+        $query->where('status', SaleStatus::Completed);
+    }
+
+    /**
+     * Bills with money still owed on them. Voided bills are never chased.
+     *
+     * @param  Builder<Sale>  $query
+     */
+    public function scopeOutstanding(Builder $query): void
+    {
+        $query->completed()->where('amount_outstanding', '>', 0);
     }
 
     /**
@@ -132,13 +184,5 @@ class Sale extends Model
     public function publicUrl(): string
     {
         return route('bill.show', $this->uuid);
-    }
-
-    /**
-     * @param  Builder<Sale>  $query
-     */
-    public function scopeCompleted(Builder $query): void
-    {
-        $query->where('status', SaleStatus::Completed);
     }
 }

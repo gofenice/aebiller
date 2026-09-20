@@ -37,6 +37,18 @@ class SaleFactory extends Factory
         ];
     }
 
+    /**
+     * A bill taken on credit, with nothing paid up front.
+     */
+    public function credit(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'payment_method' => PaymentMethod::Credit,
+            'amount_paid' => 0,
+            'amount_outstanding' => $attributes['grand_total'],
+        ]);
+    }
+
     public function voided(): static
     {
         return $this->state(fn (array $attributes): array => [

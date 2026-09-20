@@ -55,6 +55,11 @@
                             'Cashier' => $sale->cashier?->name ?? '—',
                         ];
 
+                        if ($sale->isCredit()) {
+                            $rows['Still owed'] = config('inventory.currency_symbol').number_format((float) $sale->amount_outstanding, 2);
+                            $rows['Settled'] = $sale->settled_at?->format('d M Y') ?? 'Outstanding for '.$sale->daysOutstanding().' day(s)';
+                        }
+
                         if ($sale->customer) {
                             $rows['Loyalty member'] = $sale->customer->name;
                             $rows['Points redeemed'] = number_format($sale->loyalty_points_redeemed).' ('.config('inventory.currency_symbol').number_format((float) $sale->loyalty_discount, 2).')';
@@ -69,6 +74,56 @@
                     @endforeach
                 </dl>
             </x-card>
+
+            @if ($sale->isCredit() && ! $sale->isVoided())
+                <x-card title="Credit account">
+                    @if ($sale->creditPayments->isNotEmpty())
+                        <ul class="divide-y divide-slate-100 text-sm">
+                            @foreach ($sale->creditPayments as $payment)
+                                <li class="flex justify-between gap-4 px-5 py-2.5">
+                                    <span class="text-slate-500">
+                                        {{ $payment->received_at->format('d M Y') }} · {{ $payment->payment_method->shortLabel() }}
+                                        @if ($payment->reference)
+                                            <span class="text-xs text-slate-400">({{ $payment->reference }})</span>
+                                        @endif
+                                    </span>
+                                    <span class="font-medium text-emerald-600">@money((float) $payment->amount)</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+
+                    @if ($sale->isSettled())
+                        <p class="px-5 py-4 text-sm text-emerald-700">Paid in full on {{ $sale->settled_at?->format('d M Y') }}.</p>
+                    @else
+                        <form method="POST" action="{{ route('sales.credit-payments.store', $sale) }}" class="space-y-3 p-5">
+                            @csrf
+                            <p class="text-sm text-slate-600">
+                                {{ $sale->customer?->name ?? $sale->customer_name }} owes
+                                <strong class="text-red-600">@money((float) $sale->amount_outstanding)</strong>
+                                on this bill.
+                            </p>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <x-field label="Amount" name="amount">
+                                    <x-input type="number" step="0.01" min="0.01" max="{{ (float) $sale->amount_outstanding }}"
+                                        name="amount" id="amount" value="{{ (float) $sale->amount_outstanding }}" class="text-right" required />
+                                </x-field>
+                                <x-field label="Received as" name="payment_method">
+                                    <x-select name="payment_method" id="payment_method">
+                                        @foreach (\App\Enums\PaymentMethod::settlementMethods() as $method)
+                                            <option value="{{ $method->value }}">{{ $method->label() }}</option>
+                                        @endforeach
+                                    </x-select>
+                                </x-field>
+                            </div>
+                            <x-field label="Reference" name="reference">
+                                <x-input name="reference" id="reference" placeholder="Transfer or receipt number" />
+                            </x-field>
+                            <x-button type="submit" size="sm">Record payment</x-button>
+                        </form>
+                    @endif
+                </x-card>
+            @endif
 
             @if ($sale->isVoided())
                 <x-card title="Void record">

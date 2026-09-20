@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\PaymentMethod;
 use App\Models\Category;
+use App\Models\CreditPayment;
 use App\Models\Product;
+use App\Models\Sale;
 use App\Models\StockBatch;
 use App\Services\ProfitLossReport;
 use Carbon\CarbonImmutable;
@@ -93,6 +96,49 @@ class ReportController extends Controller
                 'cost' => (float) $byCategory->sum('cost_value'),
                 'retail' => (float) $byCategory->sum('retail_value'),
             ],
+        ]);
+    }
+
+    /**
+     * What customers still owe on credit bills, oldest debt first.
+     */
+    public function credit(Request $request): View
+    {
+        $this->authorize('run-till');
+
+        $query = Sale::query()
+            ->with(['customer', 'cashier'])
+            ->outstanding()
+            ->when($request->filled('customer'), fn ($query) => $query->where('customer_id', $request->integer('customer')))
+            ->when($request->filled('search'), function ($query) use ($request): void {
+                $term = $request->string('search')->toString();
+                $query->where(function ($query) use ($term): void {
+                    $query->where('invoice_no', 'like', "%{$term}%")
+                        ->orWhere('customer_name', 'like', "%{$term}%")
+                        ->orWhere('customer_phone', 'like', "%{$term}%");
+                });
+            })
+            ->when($request->filled('older_than'), fn ($query) => $query->whereDate('sold_at', '<=', now()->subDays($request->integer('older_than'))->toDateString()));
+
+        $byCustomer = Sale::query()
+            ->outstanding()
+            ->select(
+                'customer_id',
+                DB::raw('count(*) as bills'),
+                DB::raw('coalesce(sum(amount_outstanding), 0) as owed'),
+                DB::raw('min(sold_at) as oldest_sold_at'),
+            )
+            ->groupBy('customer_id')
+            ->orderByDesc('owed')
+            ->with('customer')
+            ->get();
+
+        return view('reports.credit', [
+            'sales' => $query->orderBy('sold_at')->paginate(25)->withQueryString(),
+            'byCustomer' => $byCustomer,
+            'totalOwed' => (float) $byCustomer->sum('owed'),
+            'settlementMethods' => PaymentMethod::settlementMethods(),
+            'collectedToday' => (float) CreditPayment::whereDate('received_at', today())->sum('amount'),
         ]);
     }
 

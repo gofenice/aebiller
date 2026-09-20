@@ -32,7 +32,11 @@ class StoreSaleRequest extends FormRequest
             'customer_name' => ['nullable', 'string', 'max:120'],
             'customer_phone' => ['nullable', 'string', 'max:20'],
             'customer_vat_number' => ['nullable', 'string', 'max:20'],
-            'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
+            // Credit is chased through a member's account, so it needs one.
+            'customer_id' => [
+                Rule::requiredIf(fn (): bool => $this->string('payment_method')->toString() === PaymentMethod::Credit->value),
+                'nullable', 'integer', 'exists:customers,id',
+            ],
             'redeem_points' => ['nullable', 'integer', 'min:0', 'max:10000000'],
             // The code the member approved this redemption with. Checked again
             // against the member and the points when the bill is written.
@@ -53,6 +57,7 @@ class StoreSaleRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'customer_id.required' => 'Credit needs a loyalty member on the bill — attach the customer first.',
             'items.required' => 'Scan at least one product before taking payment.',
             'items.*.product_id.distinct' => 'The same product is listed twice — change the quantity instead.',
         ];

@@ -86,6 +86,7 @@
                 <x-nav-link :href="route('reports.expiry')" :active="request()->routeIs('reports.expiry')" icon="⏱">Expiry</x-nav-link>
                 <x-nav-link :href="route('reports.valuation')" :active="request()->routeIs('reports.valuation')" icon="¤">Stock Valuation</x-nav-link>
                 <x-nav-link :href="route('reports.loyalty')" :active="request()->routeIs('reports.loyalty')" icon="✦">Loyalty</x-nav-link>
+                <x-nav-link :href="route('reports.credit')" :active="request()->routeIs('reports.credit')" icon="◷">Credit Due</x-nav-link>
                 @can('manage-expenses')
                     <x-nav-link :href="route('reports.profit-loss')" :active="request()->routeIs('reports.profit-loss')" icon="↗">Income &amp; Expenses</x-nav-link>
                 @endcan

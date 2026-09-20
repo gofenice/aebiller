@@ -86,7 +86,12 @@
                                         <span class="block text-xs text-slate-400">{{ $sale->customer_phone }}</span>
                                     @endif
                                 </td>
-                                <td class="table-cell"><x-badge color="blue">{{ $sale->payment_method->shortLabel() }}</x-badge></td>
+                                <td class="table-cell">
+                                    <x-badge :color="$sale->isCredit() ? 'amber' : 'blue'">{{ $sale->payment_method->shortLabel() }}</x-badge>
+                                    @if ($sale->isCredit() && ! $sale->isSettled() && ! $sale->isVoided())
+                                        <span class="ml-1 text-xs font-medium text-red-600">@money((float) $sale->amount_outstanding) due</span>
+                                    @endif
+                                </td>
                                 <td class="table-cell text-right text-slate-600">{{ $sale->items_count }}</td>
                                 <td class="table-cell text-right text-slate-600">@money($sale->vat_total)</td>
                                 <td class="table-cell text-right font-semibold text-slate-900">@money($sale->grand_total)</td>

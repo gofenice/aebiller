@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CreditPaymentController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseCategoryController;
@@ -79,6 +80,7 @@ Route::middleware('auth:web')->group(function (): void {
     Route::get('sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
     Route::delete('sales/{sale}', [SaleController::class, 'destroy'])->name('sales.destroy');
     Route::post('sales/{sale}/whatsapp', WhatsAppBillController::class)->name('sales.whatsapp');
+    Route::post('sales/{sale}/credit-payments', [CreditPaymentController::class, 'store'])->name('sales.credit-payments.store');
 
     // Loyalty members and their cards
     Route::get('customers/cards', [LoyaltyCardController::class, 'sheet'])->name('customers.cards');
@@ -116,6 +118,7 @@ Route::middleware('auth:web')->group(function (): void {
         Route::get('expiry', 'expiry')->name('expiry');
         Route::get('valuation', 'valuation')->name('valuation');
         Route::get('profit-loss', 'profitLoss')->name('profit-loss');
+        Route::get('credit', 'credit')->name('credit');
     });
     Route::get('reports/loyalty', LoyaltyReportController::class)->name('reports.loyalty');
 

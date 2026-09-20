@@ -396,11 +396,12 @@
 
                             <div>
                                 <span class="form-label">Payment method</span>
-                                <div class="grid grid-cols-3 gap-2">
+                                <div class="grid grid-cols-4 gap-2">
                                     @foreach ($paymentMethods as $method)
                                         <label class="cursor-pointer">
                                             <input type="radio" class="peer sr-only" name="payment_method"
-                                                value="{{ $method->value }}" x-model="paymentMethod">
+                                                value="{{ $method->value }}" x-model="paymentMethod"
+                                                x-on:change="amountPaid = ''">
                                             <span class="block rounded-lg border border-slate-300 px-2 py-2 text-center text-xs font-medium text-slate-600
                                                 peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700">
                                                 {{ $method->shortLabel() }}
@@ -426,6 +427,20 @@
                                     <span class="text-slate-500">Change due</span>
                                     <span class="font-semibold text-slate-900">{{ $symbol }}<span x-text="money(changeDue)"></span></span>
                                 </div>
+                            </div>
+
+                            {{-- Credit closes the bill with money still owed, chased on the member's account. --}}
+                            <div x-show="isCredit" x-cloak class="space-y-2">
+                                <label for="credit_part_payment" class="form-label">Paying now (optional)</label>
+                                <input type="number" step="0.01" min="0" id="credit_part_payment" name="amount_paid"
+                                    x-model="amountPaid" placeholder="0.00" class="form-input text-right text-lg">
+                                <div class="flex justify-between rounded-lg bg-amber-50 px-3 py-2 text-sm">
+                                    <span class="text-amber-700">Goes on account</span>
+                                    <span class="font-semibold text-amber-900">{{ $symbol }}<span x-text="money(creditOutstanding)"></span></span>
+                                </div>
+                                <p class="text-xs text-slate-500" x-show="member" x-cloak>
+                                    Owed by <span class="font-medium" x-text="member?.name"></span> until paid. Track it under Reports → Credit Due.
+                                </p>
                             </div>
 
                             <button type="button" x-on:click="showCustomer = !showCustomer"

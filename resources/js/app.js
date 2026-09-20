@@ -895,6 +895,19 @@ Alpine.data('posTerminal', (config = {}) => ({
         return this.paymentMethod === 'cash';
     },
 
+    get isCredit() {
+        return this.paymentMethod === 'credit';
+    },
+
+    /** What the member still owes once this bill is written. */
+    get creditOutstanding() {
+        if (!this.isCredit) {
+            return 0;
+        }
+
+        return round2(Math.max(this.grandTotal - Number(this.amountPaid || 0), 0));
+    },
+
     get tendered() {
         return Number(this.amountPaid || 0);
     },
@@ -958,6 +971,16 @@ Alpine.data('posTerminal', (config = {}) => ({
 
         if (this.needsTendering && this.amountPaid !== '' && this.shortfall > 0) {
             return `Cash tendered is short by ${this.shortfall.toFixed(2)}.`;
+        }
+
+        // Credit is collected against a member's account later, so there has
+        // to be an account to chase.
+        if (this.isCredit && !this.member) {
+            return 'Credit needs a loyalty member on the bill — attach the customer first.';
+        }
+
+        if (this.isCredit && Number(this.amountPaid || 0) > this.grandTotal) {
+            return 'The part payment is more than the bill total.';
         }
 
         return null;
