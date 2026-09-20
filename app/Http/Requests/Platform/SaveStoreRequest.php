@@ -54,6 +54,14 @@ class SaveStoreRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:150'],
             'notes' => ['nullable', 'string', 'max:1000'],
 
+            // The shop's own WhatsApp Business sender.
+            'whatsapp_phone_number_id' => ['nullable', 'string', 'max:40'],
+            'whatsapp_token' => ['nullable', 'string', 'max:500'],
+            'whatsapp_bill_template' => ['nullable', 'string', 'max:80'],
+            'whatsapp_otp_template' => ['nullable', 'string', 'max:80'],
+            'whatsapp_language' => ['nullable', 'string', 'max:12'],
+            'whatsapp_auto_send_bill' => ['nullable', 'boolean'],
+
             // What the store pays the platform.
             'plan_id' => ['nullable', 'exists:plans,id'],
             'monthly_fee' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
@@ -104,6 +112,12 @@ class SaveStoreRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        // The saved token is never shown in the form, so an empty box means
+        // "leave it as it is", not "clear it".
+        if (! $this->filled('whatsapp_token')) {
+            $this->request->remove('whatsapp_token');
+        }
+
         if ($this->filled('slug')) {
             $this->merge(['slug' => Str::slug(Str::lower($this->string('slug')->toString()))]);
         }

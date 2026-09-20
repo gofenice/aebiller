@@ -120,6 +120,49 @@
             </div>
         </x-form-section>
 
+        <x-form-section title="WhatsApp Business" icon="✆"
+            description="The shop's own Meta Cloud API sender. With these filled in, a paid bill goes to the customer's WhatsApp on its own.">
+            <div class="grid gap-4 sm:grid-cols-6">
+                <x-field class="sm:col-span-3" label="Phone number ID" name="whatsapp_phone_number_id"
+                    hint="From Meta: WhatsApp → API setup.">
+                    <x-input name="whatsapp_phone_number_id" id="whatsapp_phone_number_id" class="font-mono"
+                        value="{{ old('whatsapp_phone_number_id', $store->whatsapp_phone_number_id) }}" />
+                </x-field>
+
+                <x-field class="sm:col-span-3" label="Permanent access token" name="whatsapp_token"
+                    :hint="$store->whatsapp_token ? 'A token is saved. Type a new one to replace it, or leave blank to keep it.' : 'The system user token from Meta. Stored encrypted.'">
+                    <x-input type="password" name="whatsapp_token" id="whatsapp_token" autocomplete="new-password"
+                        placeholder="{{ $store->whatsapp_token ? '•••••••••••••• saved' : '' }}" />
+                </x-field>
+
+                <x-field class="sm:col-span-2" label="Bill template" name="whatsapp_bill_template"
+                    hint="Approved template name.">
+                    <x-input name="whatsapp_bill_template" id="whatsapp_bill_template" class="font-mono"
+                        value="{{ old('whatsapp_bill_template', $store->whatsapp_bill_template) }}"
+                        placeholder="{{ config('services.whatsapp.bill_template') }}" />
+                </x-field>
+
+                <x-field class="sm:col-span-2" label="Redemption code template" name="whatsapp_otp_template">
+                    <x-input name="whatsapp_otp_template" id="whatsapp_otp_template" class="font-mono"
+                        value="{{ old('whatsapp_otp_template', $store->whatsapp_otp_template) }}"
+                        placeholder="{{ config('services.whatsapp.otp_template') }}" />
+                </x-field>
+
+                <x-field class="sm:col-span-2" label="Template language" name="whatsapp_language">
+                    <x-input name="whatsapp_language" id="whatsapp_language" class="font-mono"
+                        value="{{ old('whatsapp_language', $store->whatsapp_language) }}"
+                        placeholder="{{ config('services.whatsapp.language') }}" />
+                </x-field>
+
+                <div class="sm:col-span-6">
+                    <x-checkbox name="whatsapp_auto_send_bill"
+                        :checked="old('whatsapp_auto_send_bill', $store->whatsapp_auto_send_bill ?? true)"
+                        label="Send the bill automatically once payment is taken"
+                        hint="Only bills that carry a mobile number are sent. The cashier can still send a copy by hand from the bill." />
+                </div>
+            </div>
+        </x-form-section>
+
         <x-form-section title="What they pay" icon="¤" description="Leave the fee empty to charge the plan's price.">
             <div class="grid gap-4 sm:grid-cols-6">
                 <x-field class="sm:col-span-2" label="Plan" name="plan_id">

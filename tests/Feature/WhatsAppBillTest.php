@@ -18,12 +18,20 @@ class WhatsAppBillTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * Credentials live on the store, so a request re-applying the store's
+     * settings keeps them rather than wiping them.
+     */
     protected function enableWhatsApp(): void
     {
-        config([
-            'services.whatsapp.token' => 'test-token',
-            'services.whatsapp.phone_number_id' => '1234567890',
+        $this->store->update([
+            'whatsapp_token' => 'test-token',
+            'whatsapp_phone_number_id' => '1234567890',
+            // The bill is sent by hand in these tests.
+            'whatsapp_auto_send_bill' => false,
         ]);
+
+        $this->useStore($this->store->fresh());
     }
 
     protected function bill(array $overrides = []): Sale

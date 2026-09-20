@@ -5,12 +5,14 @@ namespace App\Services;
 use App\Enums\MovementType;
 use App\Enums\PaymentMethod;
 use App\Enums\SaleStatus;
+use App\Jobs\SendBillOnWhatsApp;
 use App\Models\CreditPayment;
 use App\Models\Customer;
 use App\Models\LoyaltyRedemptionOtp;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
+use App\Support\StoreContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -39,7 +41,7 @@ class BillingService
             throw new RuntimeException('The basket is empty.');
         }
 
-        return DB::transaction(function () use ($attributes, $lines, $cashier): Sale {
+        $sale = DB::transaction(function () use ($attributes, $lines, $cashier): Sale {
             $billDiscount = (float) ($attributes['bill_discount'] ?? 0);
             $priced = $this->priceBasket($lines, $billDiscount);
 
@@ -157,6 +159,29 @@ class BillingService
 
             return $sale->fresh(['items', 'cashier']);
         });
+
+        $this->queueBillCopy($sale);
+
+        return $sale;
+    }
+
+    /**
+     * Send the customer their bill once the money is in, where the shop has
+     * asked for that and left a number to send it to.
+     */
+    protected function queueBillCopy(Sale $sale): void
+    {
+        $store = StoreContext::get();
+
+        if ($store === null || ! $store->whatsapp_auto_send_bill || ! $this->whatsapp->enabled()) {
+            return;
+        }
+
+        if ($this->whatsapp->recipientFor($sale) === null) {
+            return;
+        }
+
+        SendBillOnWhatsApp::dispatch($store->id, $sale->id);
     }
 
     /**

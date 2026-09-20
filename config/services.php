@@ -67,6 +67,18 @@ return [
     'whatsapp' => [
         'token' => env('WHATSAPP_TOKEN'),
         'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+
+        // The keys above are swapped for the serving store's own as each
+        // request is identified. These are the platform's, kept aside so a
+        // store with no credentials of its own falls back to them rather than
+        // to whichever store was served last.
+        'platform' => [
+            'token' => env('WHATSAPP_TOKEN'),
+            'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+            'bill_template' => env('WHATSAPP_BILL_TEMPLATE', 'bill_copy'),
+            'otp_template' => env('WHATSAPP_OTP_TEMPLATE', 'redeem_otp'),
+            'language' => env('WHATSAPP_TEMPLATE_LANGUAGE', 'en'),
+        ],
         'base_url' => env('WHATSAPP_BASE_URL', 'https://graph.facebook.com'),
         'api_version' => env('WHATSAPP_API_VERSION', 'v21.0'),
 

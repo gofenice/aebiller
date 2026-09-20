@@ -23,6 +23,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'owner_name', 'owner_email', 'owner_phone', 'currency_code', 'currency_symbol',
     'timezone', 'phone_country_code', 'vat_number', 'address', 'phone', 'email', 'expiry_alert_days',
     'tax_rates', 'trial_ends_on', 'notes',
+    // The shop's own WhatsApp Business sender.
+    'whatsapp_phone_number_id', 'whatsapp_token', 'whatsapp_bill_template',
+    'whatsapp_otp_template', 'whatsapp_language', 'whatsapp_auto_send_bill',
     // What this store pays the platform.
     'plan_id', 'monthly_fee', 'billing_currency', 'billing_period', 'billing_day',
     'invoice_lead_days', 'grace_days', 'auto_suspend', 'billing_starts_on', 'next_invoice_on',
@@ -56,7 +59,19 @@ class Store extends Model
             'auto_suspend' => 'boolean',
             'billing_starts_on' => 'date',
             'next_invoice_on' => 'date',
+            // A token is a password to someone else's WhatsApp account; it is
+            // never readable straight out of the database.
+            'whatsapp_token' => 'encrypted',
+            'whatsapp_auto_send_bill' => 'boolean',
         ];
+    }
+
+    /**
+     * This store can send WhatsApp messages from its own number.
+     */
+    public function hasWhatsApp(): bool
+    {
+        return filled($this->whatsapp_token) && filled($this->whatsapp_phone_number_id);
     }
 
     /**
@@ -287,7 +302,18 @@ class Store extends Model
     {
         $defaults = config('tenancy.defaults');
 
+        // A shop that has entered its own WhatsApp credentials sends as
+        // itself; one that has not falls back to the platform's, never to
+        // whichever store happened to be served before it.
+        $platform = config('services.whatsapp.platform');
+        $own = $this->hasWhatsApp();
+
         return [
+            'services.whatsapp.token' => $own ? $this->whatsapp_token : $platform['token'],
+            'services.whatsapp.phone_number_id' => $own ? $this->whatsapp_phone_number_id : $platform['phone_number_id'],
+            'services.whatsapp.bill_template' => $this->whatsapp_bill_template ?: $platform['bill_template'],
+            'services.whatsapp.otp_template' => $this->whatsapp_otp_template ?: $platform['otp_template'],
+            'services.whatsapp.language' => $this->whatsapp_language ?: $platform['language'],
             'app.name' => $this->name,
             'app.timezone' => $this->timezone ?: config('app.timezone'),
             'inventory.currency_symbol' => $this->currency_symbol ?: $defaults['currency_symbol'],
