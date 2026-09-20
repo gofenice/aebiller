@@ -13,8 +13,9 @@
         <x-stat-card label="Shopped in 90 days" :value="number_format($totals['active'])"
             :sub="$totals['members'] > 0 ? round($totals['active'] / $totals['members'] * 100).'% of members' : null" tone="green" icon="↻" />
         <x-stat-card label="Points outstanding" :value="number_format($totals['points'])" sub="Not yet redeemed" tone="blue" icon="✦" />
-        <x-stat-card label="Owed in points" :value="config('inventory.currency_symbol').number_format($totals['liability'], 2)"
-            sub="If every point were redeemed today" tone="amber" icon="¤" />
+        <x-stat-card label="Owed to the shop" :value="config('inventory.currency_symbol').number_format($totals['due'], 2)"
+            :sub="$totals['owingMembers'].' member(s), incl. '.config('inventory.currency_symbol').number_format($totals['openingDue'], 2).' from before'"
+            tone="red" icon="◷" :href="route('reports.credit')" />
     </div>
 
     {{-- The checkboxes in the table belong to this form, so ticking members and
@@ -35,6 +36,7 @@
                 <option value="active" @selected(request('status') === 'active')>Active</option>
                 <option value="lapsed" @selected(request('status') === 'lapsed')>Not seen for 90 days</option>
                 <option value="on_hold" @selected(request('status') === 'on_hold')>On hold</option>
+                <option value="owing" @selected(request('status') === 'owing')>Owes money</option>
             </x-select>
             <x-select name="sort" class="w-44">
                 <option value="">Sort by name</option>
@@ -61,6 +63,7 @@
                             <th class="table-head">Mobile</th>
                             <th class="table-head">Tier</th>
                             <th class="table-head text-right">Points</th>
+                            <th class="table-head text-right">Owed</th>
                             <th class="table-head text-right">Spend</th>
                             <th class="table-head">Last visit</th>
                             <th class="table-head">Status</th>
@@ -92,6 +95,21 @@
                                 <td class="table-cell text-right">
                                     <span class="font-semibold text-slate-900">{{ number_format($customer->points_balance) }}</span>
                                     <span class="block text-xs text-slate-400">@money($customer->pointsValue($settings))</span>
+                                </td>
+                                <td class="table-cell text-right">
+                                    @php
+                                        $owed = (float) $customer->opening_due_outstanding + (float) ($customer->bills_due ?? 0);
+                                    @endphp
+                                    @if ($owed > 0)
+                                        <span class="font-semibold text-red-600">@money($owed)</span>
+                                        @if ((float) $customer->opening_due_outstanding > 0)
+                                            <span class="block text-xs text-slate-400">
+                                                @money((float) $customer->opening_due_outstanding) from before
+                                            </span>
+                                        @endif
+                                    @else
+                                        <span class="text-slate-300">—</span>
+                                    @endif
                                 </td>
                                 <td class="table-cell text-right text-slate-600">
                                     @money($customer->lifetime_spend)

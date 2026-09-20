@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\PaymentMethod;
 use App\Models\Category;
 use App\Models\CreditPayment;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\StockBatch;
@@ -133,10 +134,16 @@ class ReportController extends Controller
             ->with('customer')
             ->get();
 
+        // Balances carried over from before the shop billed here count
+        // towards what a customer owes, whether or not they have a bill.
+        $carriedOver = Customer::where('opening_due_outstanding', '>', 0)->get();
+
         return view('reports.credit', [
             'sales' => $query->orderBy('sold_at')->paginate(25)->withQueryString(),
             'byCustomer' => $byCustomer,
-            'totalOwed' => (float) $byCustomer->sum('owed'),
+            'carriedOver' => $carriedOver,
+            'openingTotal' => (float) $carriedOver->sum('opening_due_outstanding'),
+            'totalOwed' => (float) $byCustomer->sum('owed') + (float) $carriedOver->sum('opening_due_outstanding'),
             'settlementMethods' => PaymentMethod::settlementMethods(),
             'collectedToday' => (float) CreditPayment::whereDate('received_at', today())->sum('amount'),
         ]);

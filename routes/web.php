@@ -12,6 +12,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\LoyaltyCardController;
 use App\Http\Controllers\LoyaltyReportController;
 use App\Http\Controllers\LoyaltySettingController;
+use App\Http\Controllers\OpeningDueController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PublicBillController;
 use App\Http\Controllers\PublicMemberController;
@@ -88,6 +89,8 @@ Route::middleware('auth:web')->group(function (): void {
     Route::get('customers/{customer}/card', [LoyaltyCardController::class, 'show'])->name('customers.card');
     Route::post('customers/{customer}/card', [CustomerController::class, 'replaceCard'])->name('customers.replace-card');
     Route::post('customers/{customer}/points', [CustomerController::class, 'adjustPoints'])->name('customers.adjust-points');
+    Route::post('customers/{customer}/opening-due', [OpeningDueController::class, 'store'])->name('customers.opening-due.store');
+    Route::post('customers/{customer}/opening-due/payments', [OpeningDueController::class, 'pay'])->name('customers.opening-due.pay');
     Route::resource('customers', CustomerController::class);
 
     // Inventory master

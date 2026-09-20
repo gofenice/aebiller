@@ -7,6 +7,7 @@ use App\Http\Requests\StoreCustomerRequest;
 use App\Models\Customer;
 use App\Models\LoyaltySetting;
 use App\Models\LoyaltyTier;
+use App\Models\Sale;
 use App\Services\BarcodeGenerator;
 use App\Services\LoyaltyService;
 use App\Services\PlanLimits;
@@ -31,11 +32,15 @@ class CustomerController extends Controller
 
         $customers = Customer::query()
             ->with(['tier', 'activeCard'])
+            // What each member still owes on their credit bills, alongside
+            // any balance carried over from the shop's old book.
+            ->withSum(['sales as bills_due' => fn ($query) => $query->outstanding()], 'amount_outstanding')
             ->when($request->filled('search'), fn ($query) => $query->search($request->string('search')->toString()))
             ->when($request->filled('tier'), fn ($query) => $query->where('loyalty_tier_id', $request->integer('tier')))
             ->when($status === 'active', fn ($query) => $query->active())
             ->when($status === 'on_hold', fn ($query) => $query->where('is_active', false))
             // Members who have not shopped for 90 days — the ones worth a call.
+            ->when($status === 'owing', fn ($query) => $query->owing())
             ->when($status === 'lapsed', fn ($query) => $query->active()->where(fn ($query) => $query
                 ->whereNull('last_visit_at')
                 ->orWhere('last_visit_at', '<', now()->subDays(90))))
@@ -64,6 +69,9 @@ class CustomerController extends Controller
                 'newThisMonth' => Customer::where('created_at', '>=', now()->startOfMonth())->count(),
                 'points' => $outstanding,
                 'liability' => $settings->pointsWorth($outstanding),
+                'due' => (float) Customer::sum('opening_due_outstanding') + (float) Sale::outstanding()->sum('amount_outstanding'),
+                'openingDue' => (float) Customer::sum('opening_due_outstanding'),
+                'owingMembers' => Customer::owing()->count(),
             ],
         ]);
     }

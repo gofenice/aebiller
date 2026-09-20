@@ -25,12 +25,40 @@
 
     <div class="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <x-stat-card label="Total owed" :value="$symbol.number_format($totalOwed, 2)"
-            :sub="$byCustomer->sum('bills').' bill(s) unpaid'" tone="red" icon="◷" />
-        <x-stat-card label="Customers owing" :value="number_format($byCustomer->count())" icon="☺" />
+            :sub="$byCustomer->sum('bills').' bill(s) unpaid · '.$symbol.number_format($openingTotal, 2).' carried over'" tone="red" icon="◷" />
+        <x-stat-card label="Customers owing"
+            :value="number_format($byCustomer->pluck('customer_id')->merge($carriedOver->pluck('id'))->unique()->count())" icon="☺" />
         <x-stat-card label="Oldest debt" :value="$oldest ? $oldest->daysOutstanding().' days' : '—'"
             :sub="$oldest?->customer?->name" tone="amber" icon="⏱" />
         <x-stat-card label="Collected today" :value="$symbol.number_format($collectedToday, 2)" tone="green" icon="✓" />
     </div>
+
+    @if ($carriedOver->isNotEmpty())
+        <x-card class="mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+                <h2 class="text-sm font-semibold text-slate-900">Carried over from before</h2>
+                <p class="text-xs text-slate-500">Balances owed before the shop started billing here.</p>
+            </div>
+            <div class="divide-y divide-slate-100">
+                @foreach ($carriedOver as $member)
+                    <a href="{{ route('customers.show', $member) }}"
+                        class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50/70">
+                        <div class="min-w-0">
+                            <span class="block truncate text-sm font-medium text-slate-900">{{ $member->name }}</span>
+                            <span class="text-xs text-slate-500">
+                                {{ $member->formattedPhone() }}
+                                @if ($member->opening_due_on) · as at {{ $member->opening_due_on->format('d M Y') }} @endif
+                                @if ($member->opening_due_note) · {{ $member->opening_due_note }} @endif
+                            </span>
+                        </div>
+                        <span class="shrink-0 text-sm font-semibold text-red-600">
+                            {{ $symbol }}{{ number_format((float) $member->opening_due_outstanding, 2) }}
+                        </span>
+                    </a>
+                @endforeach
+            </div>
+        </x-card>
+    @endif
 
     @if ($byCustomer->isNotEmpty())
         <x-card class="mb-6">

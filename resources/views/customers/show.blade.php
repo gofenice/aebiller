@@ -186,6 +186,98 @@
                 @endif
             </div>
 
+            <x-card title="Account" description="What this customer owes: the balance carried over from before, plus any credit bill still unpaid.">
+                @php
+                    $openingDue = (float) $customer->opening_due_outstanding;
+                    $billsDue = $customer->billsDue();
+                @endphp
+
+                <dl class="divide-y divide-slate-100 text-sm">
+                    <div class="flex justify-between gap-4 px-5 py-2.5">
+                        <dt class="text-slate-500">
+                            Carried over from before
+                            @if ($customer->opening_due_on)
+                                <span class="block text-xs text-slate-400">as at {{ $customer->opening_due_on->format('d M Y') }}</span>
+                            @endif
+                            @if ($customer->opening_due_note)
+                                <span class="block text-xs text-slate-400">{{ $customer->opening_due_note }}</span>
+                            @endif
+                        </dt>
+                        <dd class="text-right font-medium {{ $openingDue > 0 ? 'text-red-600' : 'text-slate-800' }}">
+                            @money($openingDue)
+                            @if ((float) $customer->opening_due > 0 && $openingDue < (float) $customer->opening_due)
+                                <span class="block text-xs font-normal text-slate-400">
+                                    of @money((float) $customer->opening_due) originally
+                                </span>
+                            @endif
+                        </dd>
+                    </div>
+                    <div class="flex justify-between gap-4 px-5 py-2.5">
+                        <dt class="text-slate-500">Unpaid credit bills</dt>
+                        <dd class="text-right font-medium {{ $billsDue > 0 ? 'text-red-600' : 'text-slate-800' }}">@money($billsDue)</dd>
+                    </div>
+                    <div class="flex justify-between gap-4 bg-slate-50 px-5 py-2.5">
+                        <dt class="font-semibold text-slate-900">Total owed</dt>
+                        <dd class="text-right text-lg font-semibold {{ $customer->totalDue() > 0 ? 'text-red-600' : 'text-emerald-600' }}">
+                            @money($customer->totalDue())
+                        </dd>
+                    </div>
+                </dl>
+
+                @can('run-till')
+                    @if ($openingDue > 0)
+                        <form method="POST" action="{{ route('customers.opening-due.pay', $customer) }}"
+                            class="space-y-3 border-t border-slate-200 p-5">
+                            @csrf
+                            <p class="text-sm font-medium text-slate-700">Take payment against the old balance</p>
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <x-field label="Amount" name="amount">
+                                    <x-input type="number" step="0.01" min="0.01" max="{{ $openingDue }}" name="amount"
+                                        id="amount" value="{{ $openingDue }}" class="text-right" required />
+                                </x-field>
+                                <x-field label="Received as" name="payment_method">
+                                    <x-select name="payment_method" id="payment_method">
+                                        @foreach (\App\Enums\PaymentMethod::settlementMethods() as $method)
+                                            <option value="{{ $method->value }}">{{ $method->label() }}</option>
+                                        @endforeach
+                                    </x-select>
+                                </x-field>
+                                <x-field label="Reference" name="reference">
+                                    <x-input name="reference" id="reference" placeholder="Receipt number" />
+                                </x-field>
+                            </div>
+                            <x-button type="submit" size="sm">Record payment</x-button>
+                        </form>
+                    @endif
+                @endcan
+
+                @can('manage-customers')
+                    <form method="POST" action="{{ route('customers.opening-due.store', $customer) }}"
+                        class="space-y-3 border-t border-slate-200 bg-slate-50/60 p-5">
+                        @csrf
+                        <p class="text-sm font-medium text-slate-700">
+                            {{ (float) $customer->opening_due > 0 ? 'Correct the carried-over balance' : 'Add a balance carried over from before' }}
+                        </p>
+                        <div class="grid gap-3 sm:grid-cols-3">
+                            <x-field label="Total owed then" name="amount" hint="The whole amount, not what is left.">
+                                <x-input type="number" step="0.01" min="0" name="amount" id="opening_amount"
+                                    value="{{ old('amount', (float) $customer->opening_due ?: null) }}" class="text-right" required />
+                            </x-field>
+                            <x-field label="Owed as at" name="opening_due_on">
+                                <x-input type="date" name="opening_due_on" id="opening_due_on"
+                                    value="{{ old('opening_due_on', $customer->opening_due_on?->toDateString() ?? now()->toDateString()) }}" />
+                            </x-field>
+                            <x-field label="Note" name="opening_due_note">
+                                <x-input name="opening_due_note" id="opening_due_note"
+                                    value="{{ old('opening_due_note', $customer->opening_due_note) }}" placeholder="e.g. From the old ledger" />
+                            </x-field>
+                        </div>
+                        <x-button type="submit" variant="secondary" size="sm">Save balance</x-button>
+                        <p class="form-hint">Payments already taken against this balance are kept — only what is left to pay moves.</p>
+                    </form>
+                @endcan
+            </x-card>
+
             @can('manage-loyalty')
                 <x-card title="Adjust points" description="Goodwill credits and corrections. Kept on the history with your name.">
                     <form method="POST" action="{{ route('customers.adjust-points', $customer) }}" class="space-y-3 p-5">

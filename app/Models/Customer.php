@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable([
     'uuid', 'name', 'phone', 'email', 'birth_date', 'city', 'address',
     'marketing_opt_in', 'is_active', 'notes', 'loyalty_tier_id', 'enrolled_by',
+    'opening_due', 'opening_due_outstanding', 'opening_due_on', 'opening_due_note',
 ])]
 class Customer extends Model
 {
@@ -53,7 +54,39 @@ class Customer extends Model
             'visits' => 'integer',
             'lifetime_spend' => 'decimal:2',
             'last_visit_at' => 'datetime',
+            'opening_due' => 'decimal:2',
+            'opening_due_outstanding' => 'decimal:2',
+            'opening_due_on' => 'date',
         ];
+    }
+
+    /**
+     * Everything this member owes: what was carried over from the shop's old
+     * book, plus every credit bill still unpaid.
+     */
+    public function totalDue(): float
+    {
+        return round((float) $this->opening_due_outstanding + (float) $this->billsDue(), 2);
+    }
+
+    /**
+     * What is still owed on this member's credit bills.
+     */
+    public function billsDue(): float
+    {
+        return (float) $this->sales()->outstanding()->sum('amount_outstanding');
+    }
+
+    /**
+     * Members who owe the shop money, carried over or on a bill.
+     *
+     * @param  Builder<Customer>  $query
+     */
+    public function scopeOwing(Builder $query): void
+    {
+        $query->where(fn (Builder $query) => $query
+            ->where('opening_due_outstanding', '>', 0)
+            ->orWhereHas('sales', fn (Builder $sales) => $sales->outstanding()));
     }
 
     /**
@@ -144,6 +177,17 @@ class Customer extends Model
     public function sales(): HasMany
     {
         return $this->hasMany(Sale::class);
+    }
+
+    /**
+     * Money taken against this member's credit — a bill of theirs, or the
+     * balance carried over from before the shop billed here.
+     *
+     * @return HasMany<CreditPayment, $this>
+     */
+    public function creditPayments(): HasMany
+    {
+        return $this->hasMany(CreditPayment::class);
     }
 
     /**

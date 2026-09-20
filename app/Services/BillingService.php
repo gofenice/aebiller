@@ -326,6 +326,100 @@ class BillingService
     }
 
     /**
+     * Record what a customer already owed before the shop started billing
+     * here. Money already collected against that balance is kept, so a
+     * corrected total only moves what is left to pay.
+     *
+     * @param  array{amount: float|string, opening_due_on?: ?string, opening_due_note?: ?string}  $attributes
+     */
+    public function setOpeningDue(Customer $customer, array $attributes): Customer
+    {
+        return DB::transaction(function () use ($customer, $attributes): Customer {
+            $customer = Customer::lockForUpdate()->findOrFail($customer->id);
+
+            $total = round((float) $attributes['amount'], 2);
+
+            if ($total < 0) {
+                throw new RuntimeException('A carried-over balance cannot be less than nothing.');
+            }
+
+            $collected = (float) $customer->creditPayments()->whereNull('sale_id')->sum('amount');
+
+            if ($total + 0.001 < $collected) {
+                throw new RuntimeException(sprintf(
+                    '%s has already paid %s against this balance, so it cannot be set lower than that.',
+                    $customer->name,
+                    number_format($collected, 2),
+                ));
+            }
+
+            $customer->update([
+                'opening_due' => $total,
+                'opening_due_outstanding' => round($total - $collected, 2),
+                'opening_due_on' => $attributes['opening_due_on'] ?? $customer->opening_due_on ?? now()->toDateString(),
+                'opening_due_note' => $attributes['opening_due_note'] ?? $customer->opening_due_note,
+            ]);
+
+            return $customer;
+        });
+    }
+
+    /**
+     * Take money against the carried-over balance, in full or in part.
+     *
+     * @param  array{amount: float|string, payment_method?: PaymentMethod|string, reference?: ?string, notes?: ?string}  $attributes
+     */
+    public function settleOpeningDue(Customer $customer, array $attributes, User $user): CreditPayment
+    {
+        return DB::transaction(function () use ($customer, $attributes, $user): CreditPayment {
+            $customer = Customer::lockForUpdate()->findOrFail($customer->id);
+
+            $outstanding = (float) $customer->opening_due_outstanding;
+
+            if ($outstanding <= 0) {
+                throw new RuntimeException("{$customer->name} has nothing left owing from before.");
+            }
+
+            $amount = round((float) $attributes['amount'], 2);
+
+            if ($amount <= 0) {
+                throw new RuntimeException('Enter how much the customer is paying.');
+            }
+
+            if ($amount - 0.001 > $outstanding) {
+                throw new RuntimeException(sprintf(
+                    'That is more than the %s still owed from before.',
+                    number_format($outstanding, 2),
+                ));
+            }
+
+            $method = $attributes['payment_method'] ?? PaymentMethod::Cash;
+
+            if (! $method instanceof PaymentMethod) {
+                $method = PaymentMethod::from($method);
+            }
+
+            if ($method->isCredit()) {
+                throw new RuntimeException('Credit cannot pay off credit — record how the money arrived.');
+            }
+
+            $payment = $customer->creditPayments()->create([
+                'sale_id' => null,
+                'amount' => $amount,
+                'payment_method' => $method,
+                'reference' => $attributes['reference'] ?? null,
+                'notes' => $attributes['notes'] ?? null,
+                'received_by' => $user->id,
+                'received_at' => now(),
+            ]);
+
+            $customer->update(['opening_due_outstanding' => round($outstanding - $amount, 2)]);
+
+            return $payment;
+        });
+    }
+
+    /**
      * Price every line, split VAT out of the shelf price and spread any
      * bill-level discount — the cashier's and the redeemed points' — across
      * the lines so the VAT stays correct.
