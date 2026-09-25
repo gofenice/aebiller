@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\BillingPeriod;
 use App\Enums\InvoiceStatus;
 use App\Enums\StoreStatus;
+use Carbon\CarbonInterface;
 use Database\Factories\StoreFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 /**
  * One shop paying for the system. Its subdomain — fathima.pgbiller.com — is
@@ -34,7 +37,60 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Store extends Model
 {
     /** @use HasFactory<StoreFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
+
+    /**
+     * How long an archived store is kept before it can be swept away.
+     */
+    public const KEEP_ARCHIVED_DAYS = 30;
+
+    /**
+     * Archive the store: its screens stop answering and its subdomain is
+     * freed for another shop, but every row it owns stays where it is.
+     */
+    public function archive(): void
+    {
+        $this->forceFill([
+            'original_slug' => $this->original_slug ?: $this->slug,
+            // Out of the way of the unique index, so the address is free.
+            'slug' => Str::limit($this->slug, 24, '').'-archived-'.$this->id,
+        ])->save();
+
+        $this->delete();
+    }
+
+    /**
+     * Put an archived store back. It takes its old address again when no one
+     * else has taken it in the meantime.
+     */
+    public function unarchive(): bool
+    {
+        $wanted = $this->original_slug ?: $this->slug;
+        $taken = static::query()->where('slug', $wanted)->whereKeyNot($this->id)->exists();
+
+        $this->restore();
+
+        if ($taken) {
+            return false;
+        }
+
+        $this->forceFill(['slug' => $wanted, 'original_slug' => null])->save();
+
+        return true;
+    }
+
+    /**
+     * The day this archived store may be swept away.
+     */
+    public function purgeableOn(): ?CarbonInterface
+    {
+        return $this->deleted_at?->copy()->addDays(self::KEEP_ARCHIVED_DAYS);
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->trashed();
+    }
 
     /**
      * Get the attributes that should be cast.

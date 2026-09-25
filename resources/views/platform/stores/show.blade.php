@@ -173,6 +173,25 @@
                     </form>
                 </x-card>
             @endif
+
+            <x-card title="Archive this store"
+                description="The shop stops answering and gives up its address. Its data is kept for {{ \App\Models\Store::KEEP_ARCHIVED_DAYS }} days, so this can be undone.">
+                <form method="POST" action="{{ route('platform.stores.destroy', $store) }}" class="space-y-3 p-5"
+                    onsubmit="return confirm('Archive {{ addslashes($store->name) }}? Staff lose access at once and {{ $store->slug }} becomes free for another shop.')">
+                    @csrf
+                    @method('DELETE')
+                    <dl class="space-y-1 text-xs text-slate-500">
+                        <div class="flex justify-between"><dt>Products</dt><dd class="font-medium text-slate-700">{{ number_format($store->products()->count()) }}</dd></div>
+                        <div class="flex justify-between"><dt>Bills</dt><dd class="font-medium text-slate-700">{{ number_format($store->sales()->count()) }}</dd></div>
+                        <div class="flex justify-between"><dt>Staff logins</dt><dd class="font-medium text-slate-700">{{ number_format($store->users()->count()) }}</dd></div>
+                    </dl>
+                    <x-button type="submit" variant="danger" size="sm">Archive store</x-button>
+                    <p class="form-hint">
+                        After {{ \App\Models\Store::KEEP_ARCHIVED_DAYS }} days an archived store is deleted for good, along with
+                        everything above. Delete it sooner from Stores → Archived.
+                    </p>
+                </form>
+            </x-card>
         </div>
     </div>
 </x-layouts.platform>

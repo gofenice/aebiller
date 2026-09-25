@@ -24,6 +24,7 @@ class StoreController extends Controller
 
         return view('platform.stores.index', [
             'stores' => Store::query()
+                ->when($request->string('status')->toString() === 'archived', fn ($query) => $query->onlyTrashed())
                 ->withCount(['users', 'products'])
                 ->withCount(['sales as bills_this_month' => fn ($query) => $query->completed()->where('sold_at', '>=', $monthStart)])
                 ->when($request->filled('search'), function ($query) use ($request): void {
@@ -33,11 +34,15 @@ class StoreController extends Controller
                         ->orWhere('slug', 'like', "%{$term}%")
                         ->orWhere('owner_email', 'like', "%{$term}%"));
                 })
-                ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
+                ->when(
+                    $request->filled('status') && $request->string('status')->toString() !== 'archived',
+                    fn ($query) => $query->where('status', $request->string('status')->toString()),
+                )
                 ->orderBy('name')
                 ->paginate(20)
                 ->withQueryString(),
             'statuses' => StoreStatus::cases(),
+            'archivedCount' => Store::onlyTrashed()->count(),
         ]);
     }
 
@@ -150,5 +155,67 @@ class StoreController extends Controller
         ]);
 
         return back()->with('status', "{$store->name} is open again.");
+    }
+
+    /**
+     * Archive a store: it stops answering and gives up its subdomain, but its
+     * data is kept long enough for a mistake to be undone.
+     */
+    public function destroy(Store $store): RedirectResponse
+    {
+        $name = $store->name;
+        $store->archive();
+
+        return redirect()
+            ->route('platform.stores.index', ['status' => 'archived'])
+            ->with('status', sprintf(
+                '%s is archived. Its data is kept until %s, and the address %s is free again.',
+                $name,
+                $store->purgeableOn()?->format('d M Y'),
+                $store->original_slug,
+            ));
+    }
+
+    /**
+     * Put an archived store back.
+     */
+    public function restore(string $store): RedirectResponse
+    {
+        $archived = Store::onlyTrashed()->where('id', $store)->firstOrFail();
+
+        $tookOldAddress = $archived->unarchive();
+
+        return redirect()->route('platform.stores.show', $archived)->with(
+            $tookOldAddress ? 'status' : 'error',
+            $tookOldAddress
+                ? "{$archived->name} is back, at {$archived->slug}."
+                : "{$archived->name} is back, but another store has taken its old address — it is at {$archived->slug} for now.",
+        );
+    }
+
+    /**
+     * Delete an archived store and everything it owns. There is no undoing
+     * this, so the address has to be typed out to confirm.
+     */
+    public function purge(Request $request, string $store): RedirectResponse
+    {
+        $archived = Store::onlyTrashed()->where('id', $store)->firstOrFail();
+        $address = $archived->original_slug ?: $archived->slug;
+
+        $request->validate(
+            ['confirm' => ['required', 'string']],
+            ['confirm.required' => 'Type the address to confirm.'],
+        );
+
+        if ($request->string('confirm')->toString() !== $address) {
+            return back()->with('error', "That is not the address of this store. Type {$address} to confirm.");
+        }
+
+        $name = $archived->name;
+        $archived->forceDelete();
+
+        return redirect()
+            ->route('platform.stores.index')
+            ->with('status', "{$name} and all of its data have been deleted.");
     }
 }

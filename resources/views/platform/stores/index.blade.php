@@ -15,6 +15,7 @@
                 @foreach ($statuses as $status)
                     <option value="{{ $status->value }}" @selected(request('status') === $status->value)>{{ $status->label() }}</option>
                 @endforeach
+                <option value="archived" @selected(request('status') === 'archived')>Archived ({{ $archivedCount }})</option>
             </x-select>
             <x-button type="submit" variant="secondary">Filter</x-button>
         </form>
@@ -55,11 +56,54 @@
                                 <td class="table-cell text-right text-slate-600">{{ $store->users_count }}</td>
                                 <td class="table-cell text-right text-slate-600">{{ $store->products_count }}</td>
                                 <td class="table-cell text-right font-semibold text-slate-900">{{ $store->bills_this_month }}</td>
-                                <td class="table-cell"><x-badge :color="$store->status->color()">{{ $store->status->label() }}</x-badge></td>
+                                <td class="table-cell">
+                                    @if ($store->isArchived())
+                                        <x-badge color="slate">Archived</x-badge>
+                                        <span class="block text-xs text-slate-400">
+                                            kept until {{ $store->purgeableOn()?->format('d M Y') }}
+                                        </span>
+                                    @else
+                                        <x-badge :color="$store->status->color()">{{ $store->status->label() }}</x-badge>
+                                    @endif
+                                </td>
                                 <td class="table-cell text-right">
                                     <div class="flex justify-end gap-1">
-                                        <x-button :href="route('platform.stores.show', $store)" variant="ghost" size="sm">View</x-button>
-                                        <x-button :href="$store->url()" target="_blank" variant="ghost" size="sm">Open ↗</x-button>
+                                        @if ($store->isArchived())
+                                            <form method="POST" action="{{ route('platform.stores.restore', $store->id) }}">
+                                                @csrf
+                                                <x-button type="submit" variant="ghost" size="sm">Restore</x-button>
+                                            </form>
+
+                                            <div x-data="{ open: false }" class="inline-block">
+                                                <x-button type="button" variant="ghost" size="sm" class="text-red-600"
+                                                    x-on:click="open = true">Delete</x-button>
+
+                                                <div x-show="open" x-cloak
+                                                    class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4"
+                                                    x-on:click.self="open = false" x-on:keydown.escape.window="open = false">
+                                                    <form method="POST" action="{{ route('platform.stores.purge', $store->id) }}"
+                                                        class="w-full max-w-md space-y-3 rounded-xl bg-white p-5 text-left shadow-xl">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <h3 class="text-sm font-semibold text-slate-900">Delete {{ $store->name }} for good?</h3>
+                                                        <p class="text-xs text-slate-600">
+                                                            Every product, bill, customer, staff login, invoice and payment of this
+                                                            store goes with it. This cannot be undone.
+                                                        </p>
+                                                        <x-field label="Type {{ $store->original_slug ?: $store->slug }} to confirm" name="confirm">
+                                                            <x-input name="confirm" class="font-mono" autocomplete="off" required />
+                                                        </x-field>
+                                                        <div class="flex justify-end gap-2">
+                                                            <x-button type="button" variant="secondary" x-on:click="open = false">Cancel</x-button>
+                                                            <x-button type="submit" variant="danger">Delete permanently</x-button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        @else
+                                            <x-button :href="route('platform.stores.show', $store)" variant="ghost" size="sm">View</x-button>
+                                            <x-button :href="$store->url()" target="_blank" variant="ghost" size="sm">Open ↗</x-button>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

@@ -37,6 +37,11 @@ Route::middleware('platform')->group(function (): void {
     Route::put('stores/{store}', [StoreController::class, 'update'])->name('platform.stores.update');
     Route::post('stores/{store}/suspend', [StoreController::class, 'suspend'])->name('platform.stores.suspend');
     Route::post('stores/{store}/reactivate', [StoreController::class, 'reactivate'])->name('platform.stores.reactivate');
+    Route::delete('stores/{store}', [StoreController::class, 'destroy'])->name('platform.stores.destroy');
+
+    // Archived stores are addressed by id: their slug has been given up.
+    Route::post('stores/archived/{store}/restore', [StoreController::class, 'restore'])->name('platform.stores.restore');
+    Route::delete('stores/archived/{store}', [StoreController::class, 'purge'])->name('platform.stores.purge');
 
     // Monthly subscriptions. "generate" is declared first so it is not read
     // as an invoice number.
