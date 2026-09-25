@@ -69,7 +69,7 @@
                     </p>
                 </div>
 
-                <div class="grid grid-cols-2 gap-10 text-sm sm:grid-cols-3">
+                <div class="grid grid-cols-2 gap-10 text-sm sm:grid-cols-4">
                     <div>
                         <p class="mb-3 text-xs font-semibold tracking-[0.2em] text-ink-500 uppercase">Product</p>
                         <ul class="space-y-2">
@@ -88,8 +88,16 @@
                     <div>
                         <p class="mb-3 text-xs font-semibold tracking-[0.2em] text-ink-500 uppercase">Company</p>
                         <ul class="space-y-2">
-                            <li><a href="mailto:{{ config('mail.from.address') }}" class="transition hover:text-white">Contact</a></li>
+                            <li><a href="{{ route('legal.contact') }}" class="transition hover:text-white">Contact us</a></li>
                             <li><span class="text-ink-500">{{ $appHost }}</span></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <p class="mb-3 text-xs font-semibold tracking-[0.2em] text-ink-500 uppercase">Legal</p>
+                        <ul class="space-y-2">
+                            <li><a href="{{ route('legal.terms') }}" class="transition hover:text-white">Terms of Service</a></li>
+                            <li><a href="{{ route('legal.privacy') }}" class="transition hover:text-white">Privacy Policy</a></li>
+                            <li><a href="{{ route('legal.refunds') }}" class="transition hover:text-white">Refund &amp; Cancellation</a></li>
                         </ul>
                     </div>
                 </div>

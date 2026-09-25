@@ -32,6 +32,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Who the platform is, legally
+    |--------------------------------------------------------------------------
+    |
+    | Printed on the terms, privacy and refund pages, and on the contact page
+    | a payment provider looks for before it will take money on your behalf.
+    | Anything left empty is left off the page rather than guessed at.
+    |
+    */
+
+    'legal' => [
+        'entity' => env('LEGAL_ENTITY_NAME'),
+        'address' => env('LEGAL_ADDRESS'),
+        'email' => env('LEGAL_EMAIL', env('MAIL_FROM_ADDRESS')),
+        'phone' => env('LEGAL_PHONE'),
+        'hours' => env('LEGAL_SUPPORT_HOURS', 'Sunday to Thursday, 9am to 6pm'),
+
+        // Whose courts and law the agreement answers to.
+        'jurisdiction' => env('LEGAL_JURISDICTION'),
+
+        // Shown as "last updated" on each page.
+        'updated_on' => env('LEGAL_UPDATED_ON', '2026-09-25'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | The platform's own subdomains
     |--------------------------------------------------------------------------
     |
