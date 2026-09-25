@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\PlatformSetting;
 use App\Models\User;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
@@ -22,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        PlatformSetting::applyToConfig();
+
         $this->registerGates();
         $this->registerBladeDirectives();
     }

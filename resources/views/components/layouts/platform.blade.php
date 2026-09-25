@@ -41,6 +41,10 @@
                     class="rounded-lg px-3 py-1.5 text-sm font-medium transition {{ request()->routeIs('platform.plans.*') ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}">
                     Plans
                 </a>
+                <a href="{{ route('platform.settings.edit') }}"
+                    class="rounded-lg px-3 py-1.5 text-sm font-medium transition {{ request()->routeIs('platform.settings.*') ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}">
+                    Settings
+                </a>
             </nav>
 
             <div class="ml-auto flex items-center gap-3">

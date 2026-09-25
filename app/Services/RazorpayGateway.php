@@ -251,6 +251,29 @@ class RazorpayGateway
         return (int) round($amount * 100);
     }
 
+    /**
+     * Ask Razorpay whether these keys are accepted, without moving money.
+     *
+     * @return array{ok: bool, error: ?string}
+     */
+    public function ping(): array
+    {
+        try {
+            $response = $this->request()->timeout(15)->get($this->url('/plans'), ['count' => 1]);
+        } catch (\Throwable $exception) {
+            return ['ok' => false, 'error' => $exception->getMessage()];
+        }
+
+        if ($response->successful()) {
+            return ['ok' => true, 'error' => null];
+        }
+
+        return [
+            'ok' => false,
+            'error' => (string) ($response->json('error.description') ?? 'HTTP '.$response->status()),
+        ];
+    }
+
     protected function request(): PendingRequest
     {
         return Http::withBasicAuth($this->key(), $this->secret())->acceptJson();

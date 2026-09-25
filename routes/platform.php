@@ -4,6 +4,7 @@ use App\Http\Controllers\Platform\Auth\LoginController;
 use App\Http\Controllers\Platform\BillingController;
 use App\Http\Controllers\Platform\DashboardController;
 use App\Http\Controllers\Platform\PlanController;
+use App\Http\Controllers\Platform\SettingController;
 use App\Http\Controllers\Platform\StoreController;
 use Illuminate\Support\Facades\Route;
 
@@ -47,4 +48,9 @@ Route::middleware('platform')->group(function (): void {
     Route::post('billing/{invoice}/email', [BillingController::class, 'notify'])->name('platform.billing.notify');
 
     Route::resource('plans', PlanController::class)->except('show')->names('platform.plans');
+
+    // How the platform charges its shops.
+    Route::get('settings', [SettingController::class, 'edit'])->name('platform.settings.edit');
+    Route::put('settings', [SettingController::class, 'update'])->name('platform.settings.update');
+    Route::post('settings/razorpay/test', [SettingController::class, 'test'])->name('platform.settings.razorpay.test');
 });
