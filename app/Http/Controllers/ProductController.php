@@ -225,6 +225,7 @@ class ProductController extends Controller
             ->map(fn (Product $product): array => [
                 'id' => $product->id,
                 'name' => $product->display_name,
+                'url' => route('products.show', $product),
                 'sku' => $product->sku,
                 'barcode' => $product->barcode,
                 'unit' => $product->unit?->code,
