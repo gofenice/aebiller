@@ -20,7 +20,7 @@ use Illuminate\Support\Str;
  * store: a product per line, and the counted pieces as opening stock with a
  * batch per expiry date.
  */
-#[Signature('register:import {file : Path to the transcribed register JSON} {--store= : Slug of the store to import into} {--dry-run : Report what would be written without writing it}')]
+#[Signature('register:import {file : Path to the transcribed register JSON} {--store= : Slug of the store to import into} {--tax= : VAT rate for the products, defaulting to the store\'s standard rate} {--dry-run : Report what would be written without writing it}')]
 #[Description("Import a stock register JSON into a store's catalogue and opening stock")]
 class ImportRegisterCommand extends Command
 {
@@ -112,6 +112,15 @@ class ImportRegisterCommand extends Command
             $pieces = $this->unit('Piece', 'pc', false);
             $kilogram = $this->unit('Kilogram', 'kg', true);
 
+            // Shelf goods carry the store's standard rate. A register says
+            // nothing about tax, and a catalogue imported at 0% quietly sells
+            // everything VAT-free until somebody notices.
+            $taxRate = $this->option('tax') !== null
+                ? (float) $this->option('tax')
+                : (float) max(config('inventory.tax_rates') ?: [0]);
+
+            $this->line(sprintf('Products will be created at %s%% VAT, priced tax-inclusive.', rtrim(rtrim(number_format($taxRate, 2), '0'), '.')));
+
             $created = 0;
             $skipped = 0;
             $batches = 0;
@@ -161,7 +170,7 @@ class ImportRegisterCommand extends Command
                     'is_weighable' => $weighable,
                     'track_batches' => $tracksExpiry,
                     'track_expiry' => $tracksExpiry,
-                    'tax_rate' => 0,
+                    'tax_rate' => $taxRate,
                     'price_includes_tax' => true,
                     'cost_price' => 0,
                     'selling_price' => 0,

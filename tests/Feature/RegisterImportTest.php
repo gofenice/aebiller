@@ -166,6 +166,37 @@ class RegisterImportTest extends TestCase
         $this->assertSame(2, $product->batches()->count());
     }
 
+    public function test_products_carry_the_store_s_standard_vat_rate(): void
+    {
+        config(['inventory.tax_rates' => [0, 15]]);
+
+        $this->writeRegister([
+            ['name' => 'Almarai Cream Cheese', 'size' => '500 g', 'batches' => []],
+        ]);
+
+        $this->artisan('register:import', ['file' => $this->path, '--store' => $this->store->slug]);
+
+        $product = Product::sole();
+
+        $this->assertSame('15.00', $product->tax_rate);
+        $this->assertTrue($product->price_includes_tax);
+    }
+
+    public function test_the_rate_can_be_given_on_the_command(): void
+    {
+        $this->writeRegister([
+            ['name' => 'Almarai Cream Cheese', 'size' => '500 g', 'batches' => []],
+        ]);
+
+        $this->artisan('register:import', [
+            'file' => $this->path,
+            '--store' => $this->store->slug,
+            '--tax' => 5,
+        ]);
+
+        $this->assertSame('5.00', Product::sole()->tax_rate);
+    }
+
     public function test_a_dry_run_writes_nothing(): void
     {
         $this->writeRegister([
