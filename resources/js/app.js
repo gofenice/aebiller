@@ -45,75 +45,50 @@ function productPicker(lookupUrl) {
 const money = (value) => Number(value || 0).toFixed(2);
 
 /**
- * The search box on the product list: matches appear as the name is typed,
- * and Enter still runs the ordinary filtered search.
+ * The product list filters itself as the search is typed: the table below is
+ * fetched and swapped in, so the box keeps focus and the caret stays put.
  */
-Alpine.data('productSuggestions', (config = {}) => ({
-    term: new URLSearchParams(window.location.search).get('search') ?? '',
-    results: [],
-    highlighted: -1,
-    open: false,
+Alpine.data('productFilter', () => ({
     loading: false,
     controller: null,
 
-    async search() {
-        const term = this.term.trim();
+    async refresh() {
+        const form = this.$refs.filters;
+        const url = `${form.action}?${new URLSearchParams(new FormData(form))}`;
 
-        if (term.length < 2) {
-            this.close();
-
-            return;
-        }
-
-        // A keystroke cancels the request the one before it started, so the
-        // list can never be overwritten by a stale, slower answer.
+        // A keystroke cancels the request the one before it started, so a slow
+        // answer can never land on top of a newer one.
         this.controller?.abort();
         this.controller = new AbortController();
-
-        this.open = true;
         this.loading = true;
 
         try {
-            const response = await fetch(`${config.url}?q=${encodeURIComponent(term)}`, {
-                headers: { Accept: 'application/json' },
+            const response = await fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 signal: this.controller.signal,
             });
 
-            this.results = response.ok ? await response.json() : [];
-            this.highlighted = -1;
+            if (!response.ok) {
+                return;
+            }
+
+            const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const results = page.querySelector('#product-results');
+
+            if (results) {
+                this.$refs.results.innerHTML = results.innerHTML;
+            }
+
+            // The address bar follows, so a reload or a shared link shows the
+            // same list.
+            window.history.replaceState({}, '', url);
         } catch (error) {
             if (error.name !== 'AbortError') {
-                this.results = [];
+                form.submit();
             }
         } finally {
             this.loading = false;
         }
-    },
-
-    move(step) {
-        if (!this.open || this.results.length === 0) {
-            return;
-        }
-
-        const next = this.highlighted + step;
-
-        this.highlighted = (next + this.results.length) % this.results.length;
-    },
-
-    /** Enter opens the highlighted product, or searches when none is picked. */
-    choose(event) {
-        if (this.highlighted < 0 || !this.results[this.highlighted]) {
-            return;
-        }
-
-        event.preventDefault();
-        window.location.href = this.results[this.highlighted].url;
-    },
-
-    close() {
-        this.open = false;
-        this.highlighted = -1;
-        this.controller?.abort();
     },
 }));
 

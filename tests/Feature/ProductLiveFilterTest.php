@@ -12,7 +12,7 @@ use Tests\TestCase;
  * Typing in the product search shows matches as you go, without waiting for
  * the form to be submitted.
  */
-class ProductSuggestionsTest extends TestCase
+class ProductLiveFilterTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -75,13 +75,26 @@ class ProductSuggestionsTest extends TestCase
             ->assertJsonCount(1);
     }
 
-    public function test_the_search_box_on_the_list_is_wired_to_the_lookup(): void
+    public function test_the_list_filters_itself_as_the_search_is_typed(): void
     {
         $this->actingAs($this->manager)
             ->get(route('products.index'))
             ->assertOk()
-            ->assertSee('productSuggestions')
-            ->assertSee(route('products.lookup'));
+            ->assertSee('productFilter')
+            // The block the refreshed rows are swapped into.
+            ->assertSee('id="product-results"', false);
+    }
+
+    public function test_the_refreshed_list_carries_only_the_matches(): void
+    {
+        Product::factory()->create(['pack_size' => null, 'pack_unit_id' => null, 'name' => 'Milma Cow Ghee']);
+        Product::factory()->create(['pack_size' => null, 'pack_unit_id' => null, 'name' => 'Kraft Cheddar Cheese']);
+
+        $this->actingAs($this->manager)
+            ->get(route('products.index', ['search' => 'ghee']))
+            ->assertOk()
+            ->assertSee('Milma Cow Ghee')
+            ->assertDontSee('Kraft Cheddar Cheese');
     }
 
     public function test_another_store_s_products_never_appear(): void

@@ -20,51 +20,15 @@
             :href="route('products.index', ['stock' => 'out'])" />
     </div>
 
-    <x-card>
-        <form method="GET" action="{{ route('products.index') }}"
+    {{-- The table below refreshes as the search is typed; the filters still
+         submit the form the ordinary way. --}}
+    <x-card x-data="productFilter()">
+        <form method="GET" action="{{ route('products.index') }}" x-ref="filters"
             class="grid gap-3 border-b border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-6">
-            {{-- Suggestions appear as the name is typed; Enter still searches. --}}
-            <div class="relative lg:col-span-2"
-                x-data="productSuggestions({ url: '{{ route('products.lookup') }}' })"
-                x-on:click.outside="close()">
+            <div class="lg:col-span-2">
                 <x-input type="search" name="search" value="{{ request('search') }}"
                     placeholder="Name, SKU or barcode…" autocomplete="off"
-                    x-model="term"
-                    x-on:input.debounce.200ms="search()"
-                    x-on:focus="search()"
-                    x-on:keydown.arrow-down.prevent="move(1)"
-                    x-on:keydown.arrow-up.prevent="move(-1)"
-                    x-on:keydown.enter="choose($event)"
-                    x-on:keydown.escape="close()" />
-
-                <div x-show="open" x-cloak
-                    class="absolute z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                    <template x-if="loading && results.length === 0">
-                        <p class="px-3 py-2 text-xs text-slate-400">Searching…</p>
-                    </template>
-
-                    <template x-if="! loading && results.length === 0">
-                        <p class="px-3 py-2 text-xs text-slate-400">Nothing matches that.</p>
-                    </template>
-
-                    <template x-for="(result, index) in results" :key="result.id">
-                        <a :href="result.url"
-                            class="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                            :class="index === highlighted ? 'bg-brand-50 text-brand-800' : 'text-slate-700 hover:bg-slate-50'"
-                            x-on:mouseenter="highlighted = index">
-                            <span class="min-w-0">
-                                <span class="block truncate font-medium" x-text="result.name"></span>
-                                <span class="block font-mono text-[11px] text-slate-400" x-text="result.sku"></span>
-                            </span>
-                            <span class="shrink-0 text-right text-xs">
-                                <span class="block font-semibold text-slate-800"
-                                    x-text="'{{ config('inventory.currency_symbol') }}' + result.selling_price.toFixed(2)"></span>
-                                <span class="block text-slate-400"
-                                    x-text="result.current_stock + ' ' + (result.unit ?? '')"></span>
-                            </span>
-                        </a>
-                    </template>
-                </div>
+                    x-on:input.debounce.250ms="refresh()" />
             </div>
 
             <x-select name="category" x-on:change="$el.form.submit()">
@@ -98,6 +62,7 @@
             </div>
         </form>
 
+        <div id="product-results" x-ref="results" x-bind:class="loading ? 'opacity-50 transition' : ''">
         @if ($products->isEmpty())
             <x-empty-state title="No products match this view"
                 description="Adjust the filters, or add the first product to get the inventory started.">
@@ -186,5 +151,6 @@
                 {{ $products->links() }}
             </div>
         @endif
+        </div>
     </x-card>
 </x-layouts.app>
