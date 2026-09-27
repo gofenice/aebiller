@@ -81,6 +81,24 @@ class SaleController extends Controller
     }
 
     /**
+     * The bill as the thermal printer wants it: 80mm roll, no page margins,
+     * black on white. Deliberately its own bare page — the app's own styling
+     * prints as a faint grey wash on receipt paper.
+     */
+    public function print(Sale $sale, QrCodeGenerator $qr): View
+    {
+        $this->authorize('run-till');
+
+        $sale->load(['items', 'cashier', 'customer.activeCard']);
+
+        return view('sales.print', [
+            'sale' => $sale,
+            'qrSvg' => $qr->svg($sale->publicUrl(), 110),
+            'publicUrl' => $sale->publicUrl(),
+        ]);
+    }
+
+    /**
      * Void a bill and put the goods back on the shelf. Super admins only.
      */
     public function destroy(Request $request, Sale $sale): RedirectResponse

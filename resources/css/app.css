@@ -109,16 +109,29 @@
         background: #fff;
     }
 
+    /*
+     * The receipt on a screen page, printed to ordinary paper — a customer
+     * copy from the public bill link. The till prints from sales/print.blade,
+     * which is sized for the 80mm roll instead.
+     */
     .receipt {
-        width: 80mm;
-        max-width: 80mm;
+        width: 72mm;
+        max-width: 72mm;
         margin: 0;
         border: 0 !important;
         box-shadow: none !important;
         border-radius: 0 !important;
+        color: #000;
+    }
+
+    /* Slate greys come out as a faint wash on receipt paper. */
+    .receipt * {
+        color: #000 !important;
+        border-color: #000 !important;
     }
 
     @page {
-        margin: 6mm;
+        size: 80mm auto;
+        margin: 0;
     }
 }

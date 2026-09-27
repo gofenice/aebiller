@@ -79,6 +79,7 @@ Route::middleware('auth:web')->group(function (): void {
 
     Route::get('sales', [SaleController::class, 'index'])->name('sales.index');
     Route::get('sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
+    Route::get('sales/{sale}/print', [SaleController::class, 'print'])->name('sales.print');
     Route::delete('sales/{sale}', [SaleController::class, 'destroy'])->name('sales.destroy');
     Route::post('sales/{sale}/whatsapp', WhatsAppBillController::class)->name('sales.whatsapp');
     Route::post('sales/{sale}/credit-payments', [CreditPaymentController::class, 'store'])->name('sales.credit-payments.store');

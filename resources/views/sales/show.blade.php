@@ -4,7 +4,7 @@
             :description="$sale->sold_at->format('d M Y, g:i a').' · '.$sale->payment_method->label()"
             :back="route('sales.index')">
             <x-slot:actions>
-                <x-button type="button" variant="secondary" onclick="window.print()">🖨 Print bill</x-button>
+                <x-button :href="route('sales.print', $sale)" target="_blank" variant="secondary">🖨 Print bill</x-button>
                 @if ($whatsappEnabled && $sale->customer_phone)
                     <form method="POST" action="{{ route('sales.whatsapp', $sale) }}" class="inline">
                         @csrf
