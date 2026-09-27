@@ -7,6 +7,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CreditPaymentController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DueBookController;
 use App\Http\Controllers\ExpenseCategoryController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\LoyaltyCardController;
@@ -90,6 +91,10 @@ Route::middleware('auth:web')->group(function (): void {
     Route::get('customers/{customer}/card', [LoyaltyCardController::class, 'show'])->name('customers.card');
     Route::post('customers/{customer}/card', [CustomerController::class, 'replaceCard'])->name('customers.replace-card');
     Route::post('customers/{customer}/points', [CustomerController::class, 'adjustPoints'])->name('customers.adjust-points');
+    // Typing the shop's old due book in, one line at a time.
+    Route::get('customers/due-book', [DueBookController::class, 'create'])->name('customers.due-book');
+    Route::post('customers/due-book', [DueBookController::class, 'store'])->name('customers.due-book.store');
+
     Route::post('customers/{customer}/opening-due', [OpeningDueController::class, 'store'])->name('customers.opening-due.store');
     Route::post('customers/{customer}/opening-due/payments', [OpeningDueController::class, 'pay'])->name('customers.opening-due.pay');
     Route::resource('customers', CustomerController::class);

@@ -54,7 +54,8 @@
 
             <div class="space-y-1">
                 <p class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Customers</p>
-                <x-nav-link :href="route('customers.index')" :active="request()->routeIs('customers.*')" icon="★">Loyalty Members</x-nav-link>
+                <x-nav-link :href="route('customers.index')" :active="request()->routeIs('customers.index', 'customers.show', 'customers.create', 'customers.edit')" icon="★">Loyalty Members</x-nav-link>
+                <x-nav-link :href="route('customers.due-book')" :active="request()->routeIs('customers.due-book')" icon="◷">Old Due Book</x-nav-link>
             </div>
 
             <div class="space-y-1">
