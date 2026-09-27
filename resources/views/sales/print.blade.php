@@ -28,9 +28,15 @@
         }
 
         body {
-            margin: 0 auto;
-            padding: 0 2mm;
-            width: 72mm;
+            /*
+             * Hard against the left edge, never centred: "auto" margins centre
+             * the receipt inside the 80mm page and push its right-hand column
+             * past the 72.1mm the head can print, which clips the amounts.
+             * 70mm of content leaves a little room for the head's own offset.
+             */
+            margin: 0;
+            padding: 0 1mm;
+            width: 70mm;
             font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
             font-size: 12px;
             /* Thermal heads lay down thin strokes faintly: everything is bold. */
@@ -123,8 +129,8 @@
 
         /* The toolbar is for the screen only; it never reaches the roll. */
         .toolbar {
-            width: 72mm;
-            margin: 8px auto;
+            width: 70mm;
+            margin: 8px 0;
             display: flex;
             gap: 8px;
         }

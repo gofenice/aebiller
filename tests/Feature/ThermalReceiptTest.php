@@ -55,7 +55,8 @@ class ThermalReceiptTest extends TestCase
         // 80mm paper, 72mm of print, and no page margin of the browser's own.
         $response->assertSee('size: 80mm auto', false);
         $response->assertSee('margin: 0', false);
-        $response->assertSee('width: 72mm', false);
+        // Narrower than the 72.1mm the head prints, so nothing is clipped.
+        $response->assertSee('width: 70mm', false);
         $response->assertSee('window.print()', false);
     }
 
