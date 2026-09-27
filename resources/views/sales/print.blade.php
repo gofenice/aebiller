@@ -314,8 +314,37 @@
     </div>
 
     <script>
-        // Straight to the printer: the till wants one keystroke, not two.
-        window.addEventListener('load', () => window.print());
+        /*
+         * Roll printers have no page length of their own: whatever the driver
+         * is set to — 210mm, or 3276mm of "continuous" — is fed in full, and
+         * the blank remainder arrives at the top of the next receipt.
+         *
+         * So the page is told how tall this particular bill is, measured once
+         * it has been laid out, and the paper ends where the receipt does.
+         */
+        function fitPageToReceipt() {
+            const toolbar = document.querySelector('.toolbar');
+
+            // The toolbar is on the screen but never on the paper, so it must
+            // not count towards how long the paper needs to be.
+            toolbar.style.display = 'none';
+
+            const pixelsPerMm = 96 / 25.4;
+            const height = Math.ceil(document.body.scrollHeight / pixelsPerMm) + 4;
+
+            toolbar.style.display = '';
+
+            const rule = document.createElement('style');
+            rule.textContent = '@page { size: 80mm ' + height + 'mm; margin: 0; }';
+            document.head.appendChild(rule);
+        }
+
+        window.addEventListener('load', () => {
+            fitPageToReceipt();
+
+            // Straight to the printer: the till wants one keystroke, not two.
+            window.print();
+        });
     </script>
 </body>
 </html>
